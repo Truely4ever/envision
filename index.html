@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Envision Voting</title>
+  <style>
+    :root{--text:#11203f;--muted:#64748b;--line:rgba(17,32,63,.08);--surface:rgba(255,255,255,.92);--panel:#fff;--primary:#0f62fe;--primary-dark:#1244b8;--secondary:#0f766e;--success:#15803d;--danger:#dc2626;--warn:#b45309;--shadow:0 24px 54px rgba(15,98,254,.14);--r1:30px;--r2:20px;--r3:14px}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;font-family:"Segoe UI","Trebuchet MS",sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(15,98,254,.18),transparent 32%),radial-gradient(circle at top right,rgba(245,158,11,.18),transparent 28%),linear-gradient(180deg,#ecf3ff 0,#f9fbff 52%,#f4fbf7 100%)}
+    .shell{max-width:1200px;margin:0 auto;padding:18px 14px 32px}.card,.hero,.stage{background:var(--surface);border:1px solid rgba(255,255,255,.72);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+    .hero{padding:28px;border-radius:var(--r1);background:linear-gradient(135deg,#0f1d36,#0f62fe);color:#fff;text-align:center;overflow:hidden;position:relative}.hero:after{content:"";position:absolute;right:-50px;bottom:-60px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%)}
+    .brand{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);font-size:.86rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+    .hero h1{margin:14px 0 10px;font-size:clamp(2.4rem,8vw,5rem);line-height:.95;letter-spacing:-.05em}.hero h1.hero-mark{font-weight:900;letter-spacing:.08em;text-transform:uppercase;text-shadow:0 18px 36px rgba(15,23,42,.3)}.hero p{margin:0 auto;max-width:620px;color:rgba(255,255,255,.82);line-height:1.65}
+    .login-wrap,.stage-wrap{margin-top:18px}.login-wrap{display:grid;place-items:center}.card{width:min(100%,520px);border-radius:var(--r1)}.body{padding:24px}
+    h2,h3,h4{margin:0;letter-spacing:-.02em}.sub,.empty,.copy p,.banner p{color:var(--muted);line-height:1.58}
+    label{display:block;margin:14px 0 8px;font-weight:700;font-size:.92rem}input{width:100%;padding:14px 15px;border-radius:var(--r3);border:1px solid var(--line);background:#fff;color:var(--text);font:inherit;outline:none}
+    input:focus{border-color:rgba(15,98,254,.42);box-shadow:0 0 0 4px rgba(15,98,254,.12)}button{border:none;border-radius:var(--r3);padding:13px 16px;font:inherit;font-weight:700;cursor:pointer;transition:.18s transform,.18s box-shadow,.18s opacity}
+    button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,98,254,.16)}button:disabled{opacity:.72;cursor:not-allowed}.primary,.vote{width:100%;color:#fff}.primary{margin-top:14px;background:linear-gradient(135deg,var(--primary),var(--primary-dark))}.vote{background:linear-gradient(135deg,var(--secondary),#14b8a6)}.vote.locked{background:linear-gradient(135deg,#94a3b8,#64748b)}
+    .msg{min-height:24px;margin-top:12px;font-weight:700}.success{color:var(--success)}.error{color:var(--danger)}.hint{margin-top:14px;padding:14px;border-radius:16px;background:linear-gradient(135deg,rgba(245,158,11,.14),rgba(245,158,11,.08));color:#92400e;line-height:1.5;font-size:.92rem}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}.pill{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:rgba(15,118,110,.1);color:#0f766e;font-size:.82rem;font-weight:700}.linkish{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;background:rgba(15,98,254,.08);color:#0948bd;text-decoration:none;font-weight:700}
+    .stage{border-radius:var(--r1)}.stage-head{text-align:center;padding:4px 0 10px}.stage-head h2{font-size:clamp(1.8rem,5vw,2.6rem)}
+    .waiting{display:grid;place-items:center;min-height:360px;padding:20px;text-align:center}.waiting-card{max-width:520px;padding:28px;border-radius:24px;background:#fff;border:1px solid var(--line);box-shadow:0 14px 30px rgba(15,23,42,.05)}.waiting-card h3{font-size:clamp(1.5rem,4vw,2rem);margin-bottom:10px}
+    .banner{display:none;max-width:720px;margin:0 auto 16px;padding:14px 16px;border-radius:18px;background:linear-gradient(135deg,rgba(21,128,61,.12),rgba(21,128,61,.06));border:1px solid rgba(21,128,61,.16)}.banner.show{display:block}.banner strong{display:block;margin-bottom:4px;color:var(--success)}.banner.warn{background:linear-gradient(135deg,rgba(245,158,11,.14),rgba(245,158,11,.06));border-color:rgba(245,158,11,.16)}.banner.warn strong{color:var(--warn)}.banner.error{background:linear-gradient(135deg,rgba(220,38,38,.12),rgba(220,38,38,.06));border-color:rgba(220,38,38,.16)}.banner.error strong{color:var(--danger)}
+    .round-card{max-width:860px;margin:0 auto;padding:18px;border-radius:24px;background:#fff;border:1px solid var(--line);box-shadow:0 14px 30px rgba(15,23,42,.05)}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px}.nominee{background:#fff;border:1px solid var(--line);box-shadow:0 10px 24px rgba(15,23,42,.05);border-radius:20px;overflow:hidden;display:grid;grid-template-rows:210px auto}.img{width:100%;height:100%;object-fit:cover;background:linear-gradient(135deg,#dbeafe,#e0f2fe)}.copy{padding:16px;display:grid;gap:10px}.tag{display:inline-flex;align-items:center;padding:8px 11px;border-radius:999px;background:rgba(245,158,11,.12);color:#b45309;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .vote.selected{background:linear-gradient(135deg,var(--primary),var(--primary-dark))}
+    .summary-card{max-width:620px;margin:0 auto;padding:20px;border-radius:24px;background:linear-gradient(180deg,#fff,#f7fbff);border:1px solid var(--line);box-shadow:0 14px 30px rgba(15,23,42,.05);display:grid;gap:14px}
+    .summary-card .img{height:240px;border-radius:20px}
+    .summary-card h3{font-size:clamp(1.5rem,4vw,2rem)}
+    .winner-modal{position:fixed;inset:0;background:rgba(15,23,42,.58);display:none;align-items:center;justify-content:center;padding:18px;z-index:20}
+    .winner-modal.show{display:flex}
+    .winner-dialog{width:min(100%,760px);max-height:min(90vh,900px);overflow:auto;border-radius:28px;background:linear-gradient(180deg,#fff8eb,#ffffff 35%,#f7fbff);box-shadow:0 28px 70px rgba(15,23,42,.3);padding:22px;border:1px solid rgba(255,255,255,.9)}
+    .winner-head{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:14px}
+    .winner-chip{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:rgba(245,158,11,.14);color:#b45309;font-size:.82rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    .winner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px}
+    .winner-card{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 12px 26px rgba(15,23,42,.06)}
+    .winner-card .img{height:220px}
+    .winner-copy{padding:16px;display:grid;gap:8px}
+    .close-modal{background:rgba(15,98,254,.08);color:#0948bd}
+    .empty{padding:22px 18px;text-align:center;border-radius:20px;border:1px dashed rgba(17,32,63,.14);background:rgba(255,255,255,.62)}
+    .hidden{display:none!important}
+    @media (max-width:720px){.shell{padding:12px 10px 26px}.hero{padding:22px}.body{padding:18px}.topbar{justify-content:center}.waiting{min-height:300px}.winner-head{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section id="loginView">
+      <section class="hero">
+        <span class="brand">Envision</span>
+        <h1 class="hero-mark">Envision</h1>
+        <p>Enter your enrollment number to step into the Envision voting area and stay ready for the next live round.</p>
+      </section>
+
+      <section class="login-wrap">
+        <div class="card">
+          <div class="body">
+            <h2>Login With Enrollment Number</h2>
+            <p class="sub">Only students added by the admin can sign in to vote.</p>
+            <label for="enroll">Enrollment Number</label>
+            <input id="enroll" type="text" placeholder="e.g. 101">
+            <button class="primary" onclick="login()">Enter Voting Area</button>
+            <p id="loginMsg" class="msg"></p>
+            <div class="hint">You will not see any category or nominee details until the admin activates the round.</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="stageView" class="hidden">
+      <div class="topbar">
+        <span class="pill" id="welcomePill">Logged In</span>
+        <a class="linkish" href="/admin">Admin Login</a>
+      </div>
+
+      <section class="stage">
+        <div class="body">
+          <div class="stage-head">
+            <h2>Voting Area</h2>
+          </div>
+          <div id="voteBanner" class="banner"><strong>Round status</strong><p>Round updates will appear here.</p></div>
+          <div id="stageContent" class="waiting">
+            <div class="waiting-card">
+              <h3>Round Will Start Shortly</h3>
+              <p class="sub">Stay on this page. The active category and nominees will appear here once the admin starts the round.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="winnerModal" class="winner-modal" onclick="if(event.target===this)closeWinnerPopup()">
+    <div class="winner-dialog">
+      <div class="winner-head">
+        <div>
+          <span class="winner-chip">Winner Announced</span>
+          <h2 id="winnerModalTitle" style="margin-top:10px">Round Winner</h2>
+          <p id="winnerModalText" class="sub" style="margin-top:8px">The winner details will appear here.</p>
+        </div>
+        <button class="close-modal" onclick="closeWinnerPopup()">Close</button>
+      </div>
+      <div id="winnerModalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser=""; let currentStudentName=""; let roundPoller=null; let loginStartedAt="";
+    const byId=id=>document.getElementById(id);
+    const esc=value=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    const escJs=value=>String(value??"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+    function setBanner(title,detail,type="ok"){const el=byId("voteBanner");el.className=`banner show ${type==="ok"?"":type}`;el.innerHTML=`<strong>${esc(title)}</strong><p>${esc(detail)}</p>`}
+    function showWaiting(){byId("stageContent").innerHTML=`<div class="waiting"><div class="waiting-card"><h3>Round Will Start Shortly</h3><p class="sub">Stay on this page. The active category and nominees will appear here once the admin starts the round.</p></div></div>`}
+    function buildWinnerKey(announcement){return announcement?`${announcement.categoryId}-${announcement.announcedAt}`:""}
+    function closeWinnerPopup(){byId("winnerModal").classList.remove("show")}
+    function showWinnerPopup(announcement){if(!announcement||!announcement.announcedAt)return;if(loginStartedAt&&new Date(announcement.announcedAt)<new Date(loginStartedAt))return;const popupKey=buildWinnerKey(announcement);const storageKey=`winner-popup:${currentUser}`;if(sessionStorage.getItem(storageKey)===popupKey)return;sessionStorage.setItem(storageKey,popupKey);byId("winnerModalTitle").textContent=announcement.winners.length>1?`${announcement.categoryName} Winners`:`${announcement.categoryName} Winner`;byId("winnerModalText").textContent=announcement.winners.length>1?"The round ended in a tie. Here are the announced winners.":"The winner for this round has now been announced.";byId("winnerModalBody").innerHTML=`<div class="winner-grid">${announcement.winners.map(winner=>`<article class="winner-card"><img class="img" src="${esc(winner.image||"https://via.placeholder.com/600x400?text=Winner")}" alt="${esc(winner.name)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Winner';"><div class="winner-copy"><h3>${esc(winner.name)}</h3><p>${esc(winner.details||"No winner details added.")}</p><div class="sub">Votes: ${winner.votes}</div></div></article>`).join("")}</div>`;byId("winnerModal").classList.add("show")}
+    function renderPausedRound(pausedCategory,pausedVote){const announcedText=pausedCategory.winnerAnnounced?" The winner has been announced for this round.":"";if(pausedVote){setBanner(`Voting paused for ${pausedCategory.name}.`,`Your vote has already been recorded and remains visible here.${announcedText}`,pausedCategory.winnerAnnounced?"ok":"warn");byId("stageContent").innerHTML=`<div class="summary-card"><div><span class="tag">${pausedCategory.winnerAnnounced?"Your Submitted Vote":"Vote Saved"}</span><h3 style="margin-top:12px">${esc(pausedCategory.name)}</h3><p class="sub" style="margin-top:8px">Voting is paused, so no further changes can be made. Your submitted vote is shown below.</p></div><img class="img" src="${esc(pausedVote.image||"https://via.placeholder.com/600x400?text=Selected+Nominee")}" alt="${esc(pausedVote.nomineeName)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Selected+Nominee';"><div><div class="sub">You voted for</div><h4 style="margin-top:6px">${esc(pausedVote.nomineeName)}</h4><p style="margin-top:8px">${esc(pausedVote.details||"Your selected nominee has no additional details.")}</p></div></div>`;return}setBanner(`Voting paused for ${pausedCategory.name}.`,`The admin stopped this round, so further voting is closed.${announcedText}`,pausedCategory.winnerAnnounced?"ok":"warn");byId("stageContent").innerHTML=`<div class="waiting"><div class="waiting-card"><h3>${esc(pausedCategory.name)}</h3><p class="sub">This round is paused. If you had already submitted a vote, it would appear here.</p></div></div>`}
+    function renderActiveRound(data){const activeCategory=data.activeCategory;const nominees=data.nominees||[];const activeVote=data.activeVote;const selectedNomineeId=activeVote?.nomineeId||"";const isVoted=Boolean(activeVote);setBanner(isVoted?`Vote already submitted for ${activeCategory.name}.`:`${activeCategory.name} is now live.`,isVoted?"Your submitted vote is locked in for this round.":"Choose one nominee and cast your vote.","ok");if(!nominees.length){byId("stageContent").innerHTML=`<div class="waiting"><div class="waiting-card"><h3>${esc(activeCategory.name)}</h3><p class="sub">No nominees are available for this active round yet.</p></div></div>`;return}byId("stageContent").innerHTML=`<div class="round-card"><div class="stage-head" style="padding-bottom:0"><h3>${esc(activeCategory.name)}</h3><p class="sub">${isVoted?"Your vote has been recorded for this round.":"This is the only active round visible to students right now."}</p></div><div class="cards">${nominees.map((n,index)=>{const isSelected=selectedNomineeId===String(n._id);return`<article class="nominee"><img class="img" src="${esc(n.image||"https://via.placeholder.com/600x400?text=Nominee")}" alt="${esc(n.name)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Nominee';"><div class="copy"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start"><div><div class="sub">Candidate ${index+1}</div><h4>${esc(n.name)}</h4></div><span class="tag">${isSelected?"Selected":(isVoted?"Locked":"Nominee")}</span></div><p>${esc(n.details||"Nominee details will be shared by the admin.")}</p><button class="vote ${(isVoted&&!isSelected)?"locked":""} ${isSelected?"selected":""}" ${isVoted?"disabled":""} onclick="vote('${activeCategory._id}','${n._id}','${escJs(activeCategory.name)}')">${isSelected?"Your Vote":(isVoted?"Vote Submitted":"Cast Vote")}</button></div></article>`}).join("")}</div></div>`}
+    async function login(){const enrollmentNumber=byId("enroll").value.trim();const msg=byId("loginMsg");if(!enrollmentNumber){msg.innerHTML="<span class='error'>Please enter your enrollment number.</span>";return}try{const res=await fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enrollmentNumber})});const data=await res.json();if(!res.ok){msg.innerHTML=`<span class="error">${esc(data.message||"Invalid enrollment number")}</span>`;return}currentUser=enrollmentNumber;currentStudentName=data.name||"Student";loginStartedAt=new Date().toISOString();byId("welcomePill").textContent=`Welcome ${currentStudentName}`;byId("loginView").classList.add("hidden");byId("stageView").classList.remove("hidden");showWaiting();setBanner("Round will start shortly.","Nothing will be shown until the admin activates or pauses a round.","warn");await loadRoundState();startPolling()}catch(error){msg.innerHTML="<span class='error'>Unable to connect to the server.</span>"}}
+    function startPolling(){if(roundPoller)clearInterval(roundPoller);roundPoller=setInterval(loadRoundState,10000)}
+    async function loadRoundState(){if(!currentUser)return;try{const res=await fetch(`/student/round-state?enrollmentNumber=${encodeURIComponent(currentUser)}`);const data=await res.json();if(data.latestAnnouncement)showWinnerPopup(data.latestAnnouncement);if(data.activeCategory){renderActiveRound(data);return}if(data.pausedCategory){renderPausedRound(data.pausedCategory,data.pausedVote);return}showWaiting();setBanner("Round will start shortly.","The category name and nominees will appear here when the round goes live.","warn")}catch(error){showWaiting();setBanner("Could not load the round right now.","Please wait a moment and try again.","error")}}
+    async function vote(categoryId,nomineeId,categoryName){if(!confirm(`Confirm submit vote for ${categoryName}?`))return;try{const res=await fetch("/vote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enrollmentNumber:currentUser,categoryId,nomineeId})});const data=await res.json();if(!res.ok){setBanner(data.message||"Voting failed.","Your vote could not be submitted for this round.",data.message&&data.message.toLowerCase().includes("active")?"warn":"error");return}setBanner(data.message||`Vote submitted successfully for ${categoryName}.`,"This round is now locked for your session.","ok");await loadRoundState()}catch(error){setBanner("Unable to submit your vote right now.","Please check the server connection and try again.","error")}}
+  </script>
+</body>
+</html>

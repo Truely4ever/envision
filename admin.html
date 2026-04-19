@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <style>
+    :root{--text:#10233f;--muted:#64748b;--line:rgba(16,35,63,.1);--surface:rgba(255,255,255,.92);--panel:#fff;--primary:#0f62fe;--primary-dark:#0948bd;--secondary:#0f766e;--success:#15803d;--danger:#dc2626;--warn:#b45309;--shadow:0 20px 44px rgba(15,98,254,.14);--r1:28px;--r2:18px;--r3:14px}
+    *{box-sizing:border-box} body{margin:0;font-family:"Segoe UI","Trebuchet MS",sans-serif;color:var(--text);background:radial-gradient(circle at top left,rgba(15,98,254,.16),transparent 32%),radial-gradient(circle at top right,rgba(245,158,11,.15),transparent 28%),linear-gradient(180deg,#eef4ff 0,#f8fbff 52%,#eef8f4 100%)}
+    .shell{max-width:1440px;margin:0 auto;padding:20px 14px 36px}.hero,.card{background:var(--surface);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;padding:22px;border-radius:var(--r1);background:linear-gradient(135deg,#10233f,#0f62fe);color:#fff}
+    .hero h1{margin:0 0 8px;font-size:clamp(1.9rem,6vw,3rem);line-height:1.03}.hero p{margin:0;color:rgba(255,255,255,.82);line-height:1.62;max-width:720px}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.linkish,.ghost-btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 15px;border-radius:999px;text-decoration:none;font-weight:700;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.18);cursor:pointer}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.stat{padding:15px;border-radius:16px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.14)}.stat small{display:block;margin-bottom:7px;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em}.stat strong{font-size:1.3rem}
+    .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;margin-top:18px}.s4{grid-column:span 4}.s5{grid-column:span 5}.s7{grid-column:span 7}.s8{grid-column:span 8}.s12{grid-column:span 12}
+    .card{border-radius:var(--r1)}.body{padding:18px}.head{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:14px}h3,h4{margin:0;letter-spacing:-.02em}
+    .head p,.meta,.help,.msg,.empty,.copy p{color:var(--muted);line-height:1.52}.pill,.status{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;font-size:.82rem;font-weight:700}.pill{background:rgba(15,118,110,.1);color:#0f766e}.status{background:rgba(15,98,254,.08);color:#0948bd}.status.ok{background:rgba(21,128,61,.12);color:var(--success)}.status.warn{background:rgba(245,158,11,.14);color:var(--warn)}.status.bad{background:rgba(220,38,38,.12);color:var(--danger)}
+    .stack{display:grid;gap:11px}label{display:block;margin-bottom:6px;font-weight:700;font-size:.92rem}input,select,textarea{width:100%;padding:12px 13px;border-radius:var(--r3);border:1px solid var(--line);background:#fff;color:var(--text);font:inherit;outline:none}
+    textarea{min-height:88px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:rgba(15,98,254,.42);box-shadow:0 0 0 4px rgba(15,98,254,.12)}
+    button{border:none;border-radius:var(--r3);padding:11px 14px;font:inherit;font-weight:700;cursor:pointer;transition:.18s transform,.18s box-shadow}.btn,.p,.s,.d,.w{color:#fff}.btn:hover:not(:disabled),.ghost-btn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,98,254,.16)}.p{background:linear-gradient(135deg,var(--primary),var(--primary-dark))}.s{background:linear-gradient(135deg,var(--secondary),#14b8a6)}.d{background:linear-gradient(135deg,#dc2626,#b91c1c)}.w{background:linear-gradient(135deg,#f59e0b,#d97706)}.m{background:rgba(15,98,254,.08);color:#0948bd}
+    .msg{min-height:22px;margin-top:8px;font-weight:700}.success{color:var(--success)}.error{color:var(--danger)} .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .mini,.announce,.nominee{background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 24px rgba(15,23,42,.05);border-radius:18px}.mini,.result{padding:15px}
+    .row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.row-actions button{flex:1 1 110px}.nominee,.announce{overflow:hidden;padding:0}.img{width:100%;height:180px;object-fit:cover;background:linear-gradient(135deg,#dbeafe,#e0f2fe)}.copy{padding:15px;display:grid;gap:6px}
+    .empty{padding:24px 18px;text-align:center;border-radius:18px;border:1px dashed rgba(16,35,63,.14);background:rgba(255,255,255,.6)} .meta strong{color:var(--text)}
+    @media (max-width:1100px){.hero,.s4,.s5,.s7,.s8,.s12{grid-column:span 12}.hero{grid-template-columns:1fr}}
+    @media (max-width:720px){.shell{padding:14px 10px 28px}.hero{padding:18px}.stats{grid-template-columns:1fr}.body{padding:15px}.head{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>Round Control Dashboard</h1>
+        <p>Import student spreadsheets, activate one category at a time, track login and voting status, and announce each round winner with photo and details.</p>
+        <div class="actions">
+          <a class="linkish" href="/">Student Voting</a>
+          <a class="linkish" href="/results">Admin Results</a>
+          <button class="ghost-btn" onclick="logout()">Logout</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><small>Admin</small><strong id="adminName">Loading...</strong></div>
+        <div class="stat"><small>Students</small><strong id="studentCount">0</strong></div>
+        <div class="stat"><small>Current Round</small><strong id="activeRoundName">No Active Round</strong></div>
+        <div class="stat"><small>Total Votes</small><strong id="voteCount">0</strong></div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card s4"><div class="body">
+        <div class="head"><div><h3>Add Student</h3><p>Create one voter manually.</p></div><span class="pill">Voters</span></div>
+        <div class="stack">
+          <div><label for="studentName">Student Name</label><input id="studentName" type="text"></div>
+          <div><label for="studentEnrollment">Enrollment Number</label><input id="studentEnrollment" type="text"></div>
+          <button class="btn p" onclick="addStudent()">Add Student</button>
+          <p id="studentMsg" class="msg"></p>
+        </div>
+      </div></div>
+
+      <div class="card s8"><div class="body">
+        <div class="head"><div><h3>Spreadsheet Import</h3><p>Upload CSV or Excel with columns <code>name</code> and <code>enrollmentNumber</code>.</p></div><span class="pill">Bulk Import</span></div>
+        <div class="stack">
+          <div><label for="studentCsv">Spreadsheet File</label><input id="studentCsv" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+          <div><label for="studentCsvText">Or Paste CSV</label><textarea id="studentCsvText" placeholder="name,enrollmentNumber&#10;Amina,103&#10;Nihal,104"></textarea></div>
+          <button class="btn s" onclick="importStudents()">Import Student List</button>
+          <p class="help">CSV, XLSX, and XLS files are accepted. Duplicate enrollment numbers are skipped automatically.</p>
+          <p id="importMsg" class="msg"></p>
+        </div>
+      </div></div>
+
+      <div class="card s12"><div class="body">
+        <div class="head"><div><h3>Admin Security</h3><p>Change the dashboard password without resetting the rest of the election data.</p></div><span class="pill">Security</span></div>
+        <div class="stack" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));display:grid">
+          <div><label for="currentPassword">Current Password</label><input id="currentPassword" type="password"></div>
+          <div><label for="newPassword">New Password</label><input id="newPassword" type="password"></div>
+          <div style="display:flex;align-items:end"><button class="btn p" style="width:100%" onclick="changePassword()">Change Password</button></div>
+        </div>
+        <p id="passwordMsg" class="msg"></p>
+      </div></div>
+
+      <div class="card s12"><div class="body">
+        <div class="head"><div><h3>Student Participation</h3><p>See who never logged in, who logged in but did not vote, and who finished the active round.</p></div><span class="pill">Attendance</span></div>
+        <div id="participationList" class="cards"><div class="empty">No participation data yet.</div></div>
+      </div></div>
+
+      <div class="card s4"><div class="body">
+        <div class="head"><div><h3>Add Category</h3><p>Create a new round category.</p></div><span class="pill">Rounds</span></div>
+        <div class="stack">
+          <div><label for="categoryName">Category Name</label><input id="categoryName" type="text"></div>
+          <button class="btn p" onclick="addCategory()">Create Category</button>
+          <p id="categoryMsg" class="msg"></p>
+        </div>
+      </div></div>
+
+      <div class="card s8"><div class="body">
+        <div class="head"><div><h3>Round Control</h3><p>Activate, pause, edit, and announce each round.</p></div><span class="pill">One Round At A Time</span></div>
+        <div id="categoryList" class="cards"><div class="empty">No categories added yet.</div></div>
+      </div></div>
+
+      <div class="card s5"><div class="body">
+        <div class="head"><div><h3>Add Nominee</h3><p>Add photo and winner details.</p></div><span class="pill">Candidates</span></div>
+        <div class="stack">
+          <div><label for="nomineeName">Nominee Name</label><input id="nomineeName" type="text"></div>
+          <div><label for="nomineeImage">Photo URL</label><input id="nomineeImage" type="text"></div>
+          <div><label for="nomineeDetails">Details</label><textarea id="nomineeDetails"></textarea></div>
+          <div><label for="nomineeCategory">Category</label><select id="nomineeCategory"><option value="">Select category</option></select></div>
+          <button class="btn s" onclick="addNominee()">Add Nominee</button>
+          <p id="nomineeMsg" class="msg"></p>
+        </div>
+      </div></div>
+
+      <div class="card s7"><div class="body">
+        <div class="head"><div><h3>Nominee Roster</h3><p>Review candidate cards and remove entries when needed.</p></div><span class="pill">Roster</span></div>
+        <div id="nomineeList" class="cards"><div class="empty">No nominees added yet.</div></div>
+      </div></div>
+
+      <div class="card s12"><div class="body">
+        <div class="head"><div><h3>Winner Announcements</h3><p>Announced round winners appear here with photo, details, and votes.</p></div><button class="btn d" onclick="resetVotes()">Reset All Votes</button></div>
+        <p id="resetMsg" class="msg"></p>
+        <div id="announcementList" class="cards"><div class="empty">No winners announced yet.</div></div>
+      </div></div>
+    </section>
+  </main>
+
+  <script>
+    const byId = id => document.getElementById(id);
+    const esc = value => String(value ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    const escJs = value => String(value ?? "").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+    function setMsg(id,msg,type){byId(id).innerHTML=msg?`<span class="${type}">${esc(msg)}</span>`:""}
+    async function fetchJson(url,options={}){const res=await fetch(url,options);const data=await res.json().catch(()=>({}));if(res.status===401){window.location.href="/admin";throw new Error("Unauthorized")}return{res,data}}
+    async function ensureSession(){const {res,data}=await fetchJson("/admin/session");if(res.ok)byId("adminName").textContent=data.username}
+    async function logout(){await fetch("/admin/logout",{method:"POST"});window.location.href="/admin"}
+    function parseCsvLine(line){const cells=[];let cur="",q=false;for(let i=0;i<line.length;i+=1){const ch=line[i],next=line[i+1];if(ch=='"'&&q&&next=='"'){cur+='"';i+=1;continue}if(ch=='"'){q=!q;continue}if(ch===','&&!q){cells.push(cur.trim());cur="";continue}cur+=ch}cells.push(cur.trim());return cells}
+    function parseStudentsCsv(text){const lines=text.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);if(!lines.length)return[];const header=parseCsvLine(lines[0]).map(v=>v.toLowerCase());const ni=header.indexOf("name"),ei=header.indexOf("enrollmentnumber");if(ni===-1||ei===-1)throw new Error("CSV must contain name and enrollmentNumber columns");return lines.slice(1).map(line=>{const c=parseCsvLine(line);return{name:c[ni]||"",enrollmentNumber:c[ei]||""}}).filter(v=>v.name&&v.enrollmentNumber)}
+    function readFileText(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error("Could not read file"));reader.readAsText(file)})}
+    function readFileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>{const result=String(reader.result||"");resolve(result.includes(",")?result.split(",")[1]:result)};reader.onerror=()=>reject(new Error("Could not read file"));reader.readAsDataURL(file)})}
+    async function addStudent(){const name=byId("studentName").value.trim(),enrollmentNumber=byId("studentEnrollment").value.trim();if(!name||!enrollmentNumber){setMsg("studentMsg","Student name and enrollment number are required.","error");return}const {res,data}=await fetchJson("/admin/students",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,enrollmentNumber})});if(!res.ok){setMsg("studentMsg",data.message||"Could not add student.","error");return}byId("studentName").value="";byId("studentEnrollment").value="";setMsg("studentMsg","Student added successfully.","success");await refresh()}
+    async function importStudents(){try{const file=byId("studentCsv").files[0];const pasted=byId("studentCsvText").value.trim();let payload={students:[]};if(file){if(/\.(xlsx|xls)$/i.test(file.name)){payload={fileName:file.name,fileContentBase64:await readFileBase64(file)}}else{const csv=await readFileText(file);payload={students:parseStudentsCsv(csv)}}}else if(pasted){payload={students:parseStudentsCsv(pasted)}}else{setMsg("importMsg","Select a spreadsheet file or paste CSV rows first.","error");return}const {res,data}=await fetchJson("/admin/students/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!res.ok){setMsg("importMsg",data.message||"Could not import students.","error");return}byId("studentCsv").value="";byId("studentCsvText").value="";setMsg("importMsg",`${data.message}. Skipped ${data.skippedCount} row(s).`,"success");await refresh()}catch(error){setMsg("importMsg",error.message||"Could not import student list.","error")}}
+    async function changePassword(){const currentPassword=byId("currentPassword").value;const newPassword=byId("newPassword").value;if(!currentPassword||!newPassword){setMsg("passwordMsg","Current password and new password are required.","error");return}const {res,data}=await fetchJson("/admin/change-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({currentPassword,newPassword})});if(!res.ok){setMsg("passwordMsg",data.message||"Could not change password.","error");return}byId("currentPassword").value="";byId("newPassword").value="";setMsg("passwordMsg",data.message,"success")}
+    async function deleteStudent(id){if(!confirm("Delete this student and remove their vote record?"))return;await fetchJson(`/admin/students/${id}`,{method:"DELETE"});await refresh()}
+    async function addCategory(){const name=byId("categoryName").value.trim();if(!name){setMsg("categoryMsg","Category name is required.","error");return}const {res,data}=await fetchJson("/admin/categories",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})});if(!res.ok){setMsg("categoryMsg",data.message||"Could not create category.","error");return}byId("categoryName").value="";setMsg("categoryMsg","Category created successfully.","success");await refresh()}
+    async function editCategory(id,currentName){const name=prompt("Enter a new category name:",currentName);if(!name||!name.trim())return;const {res,data}=await fetchJson(`/admin/categories/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.trim()})});if(!res.ok){setMsg("categoryMsg",data.message||"Could not update category.","error");return}setMsg("categoryMsg","Category updated successfully.","success");await refresh()}
+    async function deleteCategory(id){if(!confirm("Delete this category and all its nominees and votes?"))return;const {res,data}=await fetchJson(`/admin/categories/${id}`,{method:"DELETE"});if(!res.ok){setMsg("categoryMsg",data.message||"Could not delete category.","error");return}setMsg("categoryMsg",data.message,"success");await refresh()}
+    async function activateCategory(id){if(!confirm("Activate this round now? Students will immediately see it."))return;const {res,data}=await fetchJson(`/admin/categories/${id}/activate`,{method:"POST"});if(!res.ok){setMsg("categoryMsg",data.message||"Could not activate round.","error");return}setMsg("categoryMsg",data.message,"success");await refresh()}
+    async function closeCategory(id){if(!confirm("Pause this round and stop further voting?"))return;const {res,data}=await fetchJson(`/admin/categories/${id}/close`,{method:"POST"});if(!res.ok){setMsg("categoryMsg",data.message||"Could not pause round.","error");return}setMsg("categoryMsg",data.message,"success");await refresh()}
+    async function announceWinner(id){if(!confirm("Announce the winner for this round now? Students will see a winner popup."))return;const {res,data}=await fetchJson(`/admin/categories/${id}/announce-winner`,{method:"POST"});if(!res.ok){setMsg("resetMsg",data.message||"Could not announce winner.","error");return}setMsg("resetMsg",data.message,"success");await refresh()}
+    async function addNominee(){const name=byId("nomineeName").value.trim(),image=byId("nomineeImage").value.trim(),details=byId("nomineeDetails").value.trim(),categoryId=byId("nomineeCategory").value;if(!name||!categoryId){setMsg("nomineeMsg","Nominee name and category are required.","error");return}const {res,data}=await fetchJson("/admin/nominees",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,image,details,categoryId})});if(!res.ok){setMsg("nomineeMsg",data.message||"Could not add nominee.","error");return}byId("nomineeName").value="";byId("nomineeImage").value="";byId("nomineeDetails").value="";byId("nomineeCategory").value="";setMsg("nomineeMsg","Nominee added successfully.","success");await refresh()}
+    async function deleteNominee(id){if(!confirm("Delete this nominee?"))return;await fetchJson(`/admin/nominees/${id}`,{method:"DELETE"});await refresh()}
+    async function resetVotes(){if(!confirm("Reset all votes, close all rounds, and clear winner announcements?"))return;const {res,data}=await fetchJson("/admin/reset-votes",{method:"POST"});if(!res.ok){setMsg("resetMsg",data.message||"Could not reset votes.","error");return}setMsg("resetMsg",data.message,"success");await refresh()}
+    function statusHtml(status){const lower=status.toLowerCase();let cls="";if(lower.includes("never")||lower.includes("missed"))cls="bad";else if(lower.includes("pending")||lower.includes("paused"))cls="warn";else if(lower.includes("voted")||lower.includes("active"))cls="ok";return `<span class="status ${cls}">${esc(status)}</span>`}
+    async function loadParticipation(){const {data}=await fetchJson("/admin/participation");const students=data.students||[];const active=data.activeCategory;byId("studentCount").textContent=students.length;byId("activeRoundName").textContent=active?active.name:"No Active Round";byId("participationList").innerHTML=students.length?students.map(student=>`<article class="mini"><div class="meta">Student</div><h4>${esc(student.name)}</h4><div class="meta">Enrollment: <strong>${esc(student.enrollmentNumber)}</strong></div>${statusHtml(student.currentStatus)}<div class="meta">Last login: ${student.lastLoginAt?new Date(student.lastLoginAt).toLocaleString():"Never"}</div><div class="meta">Votes cast: ${student.totalVotesCast}</div><div class="row-actions"><button class="d" onclick="deleteStudent('${student._id}')">Delete Student</button></div></article>`).join(""):`<div class="empty">No students added yet.</div>`}
+    async function loadCategories(){const res=await fetch("/categories");const categories=await res.json();byId("nomineeCategory").innerHTML=`<option value="">Select category</option>${categories.map(c=>`<option value="${c._id}">${esc(c.name)}</option>`).join("")}`;byId("categoryList").innerHTML=categories.length?categories.map(c=>`<article class="mini"><div class="meta">Round Category</div><h4>${esc(c.name)}</h4>${statusHtml(c.isActive?"Active now":(c.winnerAnnounced?"Winner announced":(c.closedAt?"Voting paused":"Inactive")))}<div class="row-actions"><button class="m" onclick="editCategory('${c._id}','${escJs(c.name)}')">Edit</button><button class="p" onclick="activateCategory('${c._id}')">Activate</button><button class="w" onclick="closeCategory('${c._id}')">Pause Voting</button><button class="s" onclick="announceWinner('${c._id}')">Announce Winner</button><button class="d" onclick="deleteCategory('${c._id}')">Delete</button></div></article>`).join(""):`<div class="empty">No categories added yet.</div>`}
+    async function loadNominees(){const {data:nominees}=await fetchJson("/admin/nominees");byId("nomineeList").innerHTML=nominees.length?nominees.map(n=>`<article class="nominee"><img class="img" src="${esc(n.image||"https://via.placeholder.com/600x400?text=Nominee")}" alt="${esc(n.name)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Nominee';"><div class="copy"><div class="meta">Nominee</div><h4>${esc(n.name)}</h4><p>${esc(n.details||"No nominee details added yet.")}</p><div class="meta">Category: ${esc(n.categoryName)}</div><div class="meta">Votes: ${n.votes||0}</div><div class="row-actions"><button class="d" onclick="deleteNominee('${n._id}')">Delete Nominee</button></div></div></article>`).join(""):`<div class="empty">No nominees added yet.</div>`}
+    async function loadAnnouncements(){const {data:results}=await fetchJson("/admin/results");byId("voteCount").textContent=results.reduce((sum,c)=>sum+c.totalVotes,0);const cards=[];results.forEach(category=>{if(Array.isArray(category.announcedWinners)&&category.announcedWinners.length){category.announcedWinners.forEach(w=>cards.push(`<article class="announce"><img class="img" src="${esc(w.image||"https://via.placeholder.com/600x400?text=Winner")}" alt="${esc(w.name)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Winner';"><div class="copy"><div class="meta">${esc(category.name)}</div><h4>${esc(w.name)}</h4><p>${esc(w.details||"No winner details added.")}</p><div class="meta">Votes: ${w.votes}</div><div class="meta">Announced: ${category.announcedAt?new Date(category.announcedAt).toLocaleString():"Just now"}</div></div></article>`))}});byId("announcementList").innerHTML=cards.length?cards.join(""):`<div class="empty">No winners announced yet.</div>`}
+    async function refresh(){await loadParticipation();await loadCategories();await loadNominees();await loadAnnouncements()}
+    async function init(){await ensureSession();await refresh()}
+    init();
+  </script>
+</body>
+</html>
