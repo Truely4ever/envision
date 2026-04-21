@@ -207,6 +207,51 @@ async function getRoundSnapshot(category) {
   };
 }
 
+async function replaceCategoryContestants(category, contestants) {
+  const uniqueContestants = [];
+  const seen = new Set();
+
+  contestants.forEach(contestant => {
+    const enrollmentNumber = String(contestant.enrollmentNumber || "").trim();
+    const name = String(contestant.name || "").trim();
+
+    if (!name || !enrollmentNumber || seen.has(enrollmentNumber)) {
+      return;
+    }
+
+    seen.add(enrollmentNumber);
+    uniqueContestants.push({ name, enrollmentNumber });
+  });
+
+  await Vote.deleteMany({ categoryId: category._id.toString() });
+  await Nominee.deleteMany({ categoryId: category._id.toString() });
+
+  const inserted = uniqueContestants.length
+    ? await Nominee.insertMany(
+        uniqueContestants.map(contestant => ({
+          name: contestant.name,
+          enrollmentNumber: contestant.enrollmentNumber,
+          categoryId: category._id.toString()
+        }))
+      )
+    : [];
+
+  category.isActive = false;
+  category.isRunoff = false;
+  category.currentRoundNumber = 1;
+  category.activeCandidateIds = inserted.map(contestant => contestant._id.toString());
+  category.closedAt = null;
+  category.winnerAnnounced = false;
+  category.announcedAt = null;
+  category.announcedWinners = [];
+  await category.save();
+
+  return {
+    insertedCount: inserted.length,
+    skippedCount: contestants.length - uniqueContestants.length
+  };
+}
+
 async function buildCategoryResults() {
   const categories = await Category.find().sort({ name: 1 }).lean();
   const nominees = await Nominee.find().lean();
@@ -1044,6 +1089,30 @@ app.get("/admin/categories/:id/contestants", requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/admin/class-list-presets", requireAdmin, async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ name: 1 }).lean();
+    const nominees = await Nominee.find({}, { categoryId: 1 }).lean();
+    const counts = nominees.reduce((map, nominee) => {
+      map[nominee.categoryId] = (map[nominee.categoryId] || 0) + 1;
+      return map;
+    }, {});
+
+    res.json(
+      categories
+        .map(category => ({
+          _id: category._id,
+          name: category.name,
+          studentListLabel: category.studentListLabel || "",
+          contestantCount: counts[category._id.toString()] || 0
+        }))
+        .filter(category => category.contestantCount > 0)
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Could not load class list presets" });
+  }
+});
+
 app.post("/admin/categories/:id/contestants/import", requireAdmin, async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
@@ -1057,47 +1126,56 @@ app.post("/admin/categories/:id/contestants/import", requireAdmin, async (req, r
     if (!contestants.length) {
       return res.status(400).json({ message: "No students found in uploaded class list" });
     }
-
-    const uniqueContestants = [];
-    const seen = new Set();
-
-    contestants.forEach(contestant => {
-      if (seen.has(contestant.enrollmentNumber)) {
-        return;
-      }
-
-      seen.add(contestant.enrollmentNumber);
-      uniqueContestants.push(contestant);
-    });
-
-    await Vote.deleteMany({ categoryId: category._id.toString() });
-    await Nominee.deleteMany({ categoryId: category._id.toString() });
-
-    const inserted = await Nominee.insertMany(
-      uniqueContestants.map(contestant => ({
-        name: contestant.name,
-        enrollmentNumber: contestant.enrollmentNumber,
-        categoryId: category._id.toString()
-      }))
-    );
-
-    category.isActive = false;
-    category.isRunoff = false;
-    category.currentRoundNumber = 1;
-    category.activeCandidateIds = inserted.map(contestant => contestant._id.toString());
-    category.closedAt = null;
-    category.winnerAnnounced = false;
-    category.announcedAt = null;
-    category.announcedWinners = [];
-    await category.save();
+    const result = await replaceCategoryContestants(category, contestants);
 
     res.json({
-      message: `Uploaded ${inserted.length} student(s) for ${category.name}`,
-      importedCount: inserted.length,
-      skippedCount: contestants.length - inserted.length
+      message: `Uploaded ${result.insertedCount} student(s) for ${category.name}`,
+      importedCount: result.insertedCount,
+      skippedCount: result.skippedCount
     });
   } catch (error) {
     res.status(500).json({ message: "Could not upload class list" });
+  }
+});
+
+app.post("/admin/categories/:id/contestants/apply-preset", requireAdmin, async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    const sourceCategoryId = (req.body.sourceCategoryId || "").trim();
+
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    if (!sourceCategoryId) {
+      return res.status(400).json({ message: "Select a preset class list first" });
+    }
+
+    if (sourceCategoryId === category._id.toString()) {
+      return res.status(400).json({ message: "Choose a different category as the preset source" });
+    }
+
+    const sourceCategory = await Category.findById(sourceCategoryId).lean();
+
+    if (!sourceCategory) {
+      return res.status(404).json({ message: "Preset source category not found" });
+    }
+
+    const contestants = await getCategoryContestants(sourceCategoryId);
+
+    if (!contestants.length) {
+      return res.status(400).json({ message: "The selected preset does not have an uploaded class list" });
+    }
+
+    const result = await replaceCategoryContestants(category, contestants);
+
+    res.json({
+      message: `Applied ${sourceCategory.name} as the class list preset for ${category.name}`,
+      importedCount: result.insertedCount,
+      skippedCount: result.skippedCount
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Could not apply class list preset" });
   }
 });
 
