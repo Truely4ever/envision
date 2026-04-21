@@ -2,7 +2,11 @@ const mongoose = require("mongoose");
 
 const categorySchema = new mongoose.Schema({
   name: String,
+  studentListLabel: { type: String, default: "" },
   isActive: { type: Boolean, default: false },
+  isRunoff: { type: Boolean, default: false },
+  currentRoundNumber: { type: Number, default: 1 },
+  activeCandidateIds: { type: [String], default: [] },
   closedAt: { type: Date, default: null },
   winnerAnnounced: { type: Boolean, default: false },
   announcedAt: { type: Date, default: null },
@@ -11,8 +15,7 @@ const categorySchema = new mongoose.Schema({
       {
         nomineeId: String,
         name: String,
-        image: String,
-        details: String,
+        enrollmentNumber: String,
         votes: Number
       }
     ],

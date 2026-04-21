@@ -2,8 +2,7 @@ const mongoose = require("mongoose");
 
 const nomineeSchema = new mongoose.Schema({
   name: String,
-  image: String,
-  details: String,
+  enrollmentNumber: String,
   categoryId: String,
   votes: { type: Number, default: 0 }
 });

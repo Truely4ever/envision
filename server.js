@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const crypto = require("crypto");
 const express = require("express");
 const mongoose = require("mongoose");
@@ -14,23 +16,30 @@ const Vote = require("./models/Vote");
 const app = express();
 const adminSessions = new Map();
 const PORT = Number(process.env.PORT) || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/farewell";
+const MONGODB_URI = process.env.MONGODB_URI;
 const DEFAULT_ADMIN_USERNAME = (process.env.DEFAULT_ADMIN_USERNAME || "admin").trim();
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || "admin123";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 app.set("trust proxy", 1);
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 app.use(cors());
 app.use(express.static(__dirname));
 
+if (!MONGODB_URI) {
+  console.error("MongoDB Error: MONGODB_URI is not defined");
+  process.exit(1);
+}
+
 mongoose
-  .connect(MONGODB_URI)
+  .connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log("MongoDB Connected");
     await ensureDefaultAdmin();
   })
-  .catch(error => console.log("MongoDB Error:", error));
+  .catch(error => {
+    console.error("MongoDB Error:", error);
+  });
 
 function parseCookies(req) {
   const header = req.headers.cookie || "";
@@ -91,24 +100,156 @@ async function ensureDefaultAdmin() {
   }
 }
 
+function getVoteRoundNumber(vote) {
+  return Number(vote.roundNumber) || 1;
+}
+
+function buildRoundMatch(roundNumber) {
+  if (Number(roundNumber) === 1) {
+    return [{ roundNumber: 1 }, { roundNumber: { $exists: false } }];
+  }
+
+  return [{ roundNumber: Number(roundNumber) || 1 }];
+}
+
+async function getCategoryContestants(categoryId) {
+  return Nominee.find({ categoryId }).sort({ name: 1, enrollmentNumber: 1 }).lean();
+}
+
+function getActiveCandidateIds(category, contestants) {
+  if (Array.isArray(category.activeCandidateIds) && category.activeCandidateIds.length) {
+    const available = new Set(contestants.map(contestant => contestant._id.toString()));
+    return category.activeCandidateIds.filter(candidateId => available.has(candidateId));
+  }
+
+  return contestants.map(contestant => contestant._id.toString());
+}
+
+function buildVoteMap(votes) {
+  return votes.reduce((map, vote) => {
+    map[vote.nomineeId] = (map[vote.nomineeId] || 0) + 1;
+    return map;
+  }, {});
+}
+
+function normalizeSpreadsheetRows(rows) {
+  return rows.reduce((payload, row) => {
+    const normalizedKeys = Object.keys(row || {}).reduce((keys, key) => {
+      keys[key.toLowerCase().replace(/\s+/g, "")] = row[key];
+      return keys;
+    }, {});
+
+    const name = String(
+      normalizedKeys.name ||
+      normalizedKeys.studentname ||
+      normalizedKeys.fullname ||
+      ""
+    ).trim();
+    const enrollmentNumber = String(
+      normalizedKeys.enrollmentnumber ||
+      normalizedKeys.enrollment ||
+      normalizedKeys.rollnumber ||
+      normalizedKeys.admissionnumber ||
+      ""
+    ).trim();
+
+    if (!name || !enrollmentNumber) {
+      return payload;
+    }
+
+    payload.push({ name, enrollmentNumber });
+    return payload;
+  }, []);
+}
+
+function parseSpreadsheetPayload(body) {
+  let rows = Array.isArray(body.students) ? body.students : [];
+
+  if (!rows.length && body.fileContentBase64) {
+    const fileBuffer = Buffer.from(body.fileContentBase64, "base64");
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    const firstSheetName = workbook.SheetNames[0];
+    const firstSheet = workbook.Sheets[firstSheetName];
+    rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+  }
+
+  return normalizeSpreadsheetRows(rows);
+}
+
+async function getRoundSnapshot(category) {
+  const contestants = await getCategoryContestants(category._id.toString());
+  const activeCandidateIds = getActiveCandidateIds(category, contestants);
+  const activeIdSet = new Set(activeCandidateIds);
+  const roundVotes = await Vote.find({
+    categoryId: category._id.toString(),
+    $or: buildRoundMatch(category.currentRoundNumber || 1)
+  }).lean();
+  const voteMap = buildVoteMap(roundVotes);
+
+  const roundContestants = contestants
+    .filter(contestant => activeIdSet.has(contestant._id.toString()))
+    .map(contestant => ({
+      ...contestant,
+      votes: voteMap[contestant._id.toString()] || 0
+    }))
+    .sort((a, b) => {
+      if (b.votes !== a.votes) {
+        return b.votes - a.votes;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+  return {
+    contestants,
+    roundContestants,
+    roundVotes
+  };
+}
+
 async function buildCategoryResults() {
   const categories = await Category.find().sort({ name: 1 }).lean();
   const nominees = await Nominee.find().lean();
+  const votes = await Vote.find().lean();
 
   return categories.map(category => {
-    const categoryNominees = nominees
-      .filter(nominee => nominee.categoryId === category._id.toString())
-      .sort((a, b) => b.votes - a.votes);
+    const currentRoundNumber = category.currentRoundNumber || 1;
+    const categoryNominees = nominees.filter(
+      nominee => nominee.categoryId === category._id.toString()
+    );
+    const activeCandidateIds = getActiveCandidateIds(category, categoryNominees);
+    const activeIdSet = new Set(activeCandidateIds);
+    const categoryVotes = votes.filter(vote => vote.categoryId === category._id.toString());
+    const currentRoundVotes = categoryVotes.filter(
+      vote => getVoteRoundNumber(vote) === currentRoundNumber
+    );
+    const voteMap = buildVoteMap(currentRoundVotes);
 
-    const highestVotes = categoryNominees.length ? categoryNominees[0].votes : 0;
-    const currentLeaders = categoryNominees.filter(
+    const leaderboard = categoryNominees
+      .filter(nominee => activeIdSet.has(nominee._id.toString()))
+      .map(nominee => ({
+        ...nominee,
+        votes: voteMap[nominee._id.toString()] || 0
+      }))
+      .sort((a, b) => {
+        if (b.votes !== a.votes) {
+          return b.votes - a.votes;
+        }
+
+        return a.name.localeCompare(b.name);
+      });
+
+    const highestVotes = leaderboard.length ? leaderboard[0].votes : 0;
+    const currentLeaders = leaderboard.filter(
       nominee => nominee.votes === highestVotes && highestVotes > 0
     );
 
     return {
       ...category,
-      totalVotes: categoryNominees.reduce((sum, nominee) => sum + nominee.votes, 0),
-      nominees: categoryNominees,
+      contestantCount: categoryNominees.length,
+      totalVotes: categoryVotes.length,
+      currentRoundVotes: currentRoundVotes.length,
+      nominees: leaderboard,
       currentLeaders
     };
   });
@@ -135,13 +276,23 @@ async function buildParticipation() {
 
   return students.map(student => {
     const studentVotes = votesByStudent[student.enrollmentNumber] || [];
-    const votedCategoryIds = studentVotes.map(vote => vote.categoryId);
+    const votedCategoryIds = [...new Set(studentVotes.map(vote => vote.categoryId))];
     const hasLoggedIn = Boolean(student.lastLoginAt);
+    const activeRoundNumber = activeCategory?.currentRoundNumber || 1;
+    const pausedRoundNumber = pausedCategory?.currentRoundNumber || 1;
     const hasVotedInActiveRound = activeCategory
-      ? votedCategoryIds.includes(activeCategory._id.toString())
+      ? studentVotes.some(
+          vote =>
+            vote.categoryId === activeCategory._id.toString() &&
+            getVoteRoundNumber(vote) === activeRoundNumber
+        )
       : false;
     const hasVotedInPausedRound = pausedCategory
-      ? votedCategoryIds.includes(pausedCategory._id.toString())
+      ? studentVotes.some(
+          vote =>
+            vote.categoryId === pausedCategory._id.toString() &&
+            getVoteRoundNumber(vote) === pausedRoundNumber
+        )
       : false;
 
     let currentStatus = "Waiting for next round";
@@ -172,17 +323,27 @@ async function buildParticipation() {
 }
 
 async function setActiveCategory(categoryId) {
+  const category = await Category.findById(categoryId);
+
+  if (!category) {
+    return null;
+  }
+
+  const contestants = await getCategoryContestants(category._id.toString());
+  const candidateIds = getActiveCandidateIds(category, contestants);
+
+  if (!candidateIds.length) {
+    throw new Error("No class list uploaded for this category");
+  }
+
   await Category.updateMany({}, { $set: { isActive: false } });
-  return Category.findByIdAndUpdate(
-    categoryId,
-    {
-      $set: {
-        isActive: true,
-        closedAt: null
-      }
-    },
-    { new: true }
-  );
+
+  category.isActive = true;
+  category.closedAt = null;
+  category.activeCandidateIds = candidateIds;
+  await category.save();
+
+  return category;
 }
 
 async function buildStudentRoundState(enrollmentNumber) {
@@ -206,11 +367,13 @@ async function buildStudentRoundState(enrollmentNumber) {
   let nominees = [];
 
   if (activeCategory) {
-    nominees = await Nominee.find({
-      categoryId: activeCategory._id.toString()
-    })
-      .sort({ name: 1 })
-      .lean();
+    const snapshot = await getRoundSnapshot(activeCategory);
+    nominees = snapshot.roundContestants.map(contestant => ({
+      _id: contestant._id,
+      name: contestant.name,
+      enrollmentNumber: contestant.enrollmentNumber,
+      votes: contestant.votes
+    }));
   }
 
   if (enrollmentNumber) {
@@ -225,13 +388,13 @@ async function buildStudentRoundState(enrollmentNumber) {
         }).lean()
       : [];
 
-    const voteByCategory = votes.reduce((map, vote) => {
-      map[vote.categoryId] = vote;
-      return map;
-    }, {});
-
     if (activeCategory) {
-      const activeVoteRecord = voteByCategory[activeCategory._id.toString()];
+      const activeRoundNumber = activeCategory.currentRoundNumber || 1;
+      const activeVoteRecord = votes.find(
+        vote =>
+          vote.categoryId === activeCategory._id.toString() &&
+          getVoteRoundNumber(vote) === activeRoundNumber
+      );
 
       if (activeVoteRecord) {
         activeVote = {
@@ -241,16 +404,20 @@ async function buildStudentRoundState(enrollmentNumber) {
     }
 
     if (latestClosedCategory) {
-      const pausedVoteRecord = voteByCategory[latestClosedCategory._id.toString()];
+      const pausedRoundNumber = latestClosedCategory.currentRoundNumber || 1;
+      const pausedVoteRecord = votes.find(
+        vote =>
+          vote.categoryId === latestClosedCategory._id.toString() &&
+          getVoteRoundNumber(vote) === pausedRoundNumber
+      );
 
       if (pausedVoteRecord) {
         const pausedNominee = await Nominee.findById(pausedVoteRecord.nomineeId).lean();
 
         pausedVote = {
           nomineeId: pausedVoteRecord.nomineeId,
-          nomineeName: pausedNominee?.name || "Selected nominee",
-          image: pausedNominee?.image || "",
-          details: pausedNominee?.details || ""
+          nomineeName: pausedNominee?.name || "Selected student",
+          enrollmentNumber: pausedNominee?.enrollmentNumber || ""
         };
       }
     }
@@ -260,7 +427,10 @@ async function buildStudentRoundState(enrollmentNumber) {
     activeCategory: activeCategory
       ? {
           _id: activeCategory._id,
-          name: activeCategory.name
+          name: activeCategory.name,
+          currentRoundNumber: activeCategory.currentRoundNumber || 1,
+          isRunoff: Boolean(activeCategory.isRunoff),
+          studentListLabel: activeCategory.studentListLabel || ""
         }
       : null,
     nominees,
@@ -270,6 +440,8 @@ async function buildStudentRoundState(enrollmentNumber) {
           _id: latestClosedCategory._id,
           name: latestClosedCategory.name,
           closedAt: latestClosedCategory.closedAt,
+          currentRoundNumber: latestClosedCategory.currentRoundNumber || 1,
+          isRunoff: Boolean(latestClosedCategory.isRunoff),
           winnerAnnounced: Boolean(latestClosedCategory.winnerAnnounced)
         }
       : null,
@@ -421,7 +593,9 @@ app.get("/student/active-round", async (req, res) => {
     res.json({
       activeCategory: {
         _id: activeCategory._id,
-        name: activeCategory.name
+        name: activeCategory.name,
+        currentRoundNumber: activeCategory.currentRoundNumber || 1,
+        isRunoff: Boolean(activeCategory.isRunoff)
       }
     });
   } catch (error) {
@@ -450,16 +624,16 @@ app.get("/student/active-round/nominees", async (req, res) => {
       });
     }
 
-    const nominees = await Nominee.find({
-      categoryId: activeCategory._id.toString()
-    }).sort({ name: 1 });
+    const snapshot = await getRoundSnapshot(activeCategory);
 
     res.json({
       activeCategory: {
         _id: activeCategory._id,
-        name: activeCategory.name
+        name: activeCategory.name,
+        currentRoundNumber: activeCategory.currentRoundNumber || 1,
+        isRunoff: Boolean(activeCategory.isRunoff)
       },
-      nominees
+      nominees: snapshot.roundContestants
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching active round nominees" });
@@ -468,8 +642,19 @@ app.get("/student/active-round/nominees", async (req, res) => {
 
 app.get("/categories", async (req, res) => {
   try {
-    const categories = await Category.find().sort({ name: 1 });
-    res.json(categories);
+    const categories = await Category.find().sort({ name: 1 }).lean();
+    const nominees = await Nominee.find({}, { categoryId: 1 }).lean();
+    const counts = nominees.reduce((map, nominee) => {
+      map[nominee.categoryId] = (map[nominee.categoryId] || 0) + 1;
+      return map;
+    }, {});
+
+    res.json(
+      categories.map(category => ({
+        ...category,
+        contestantCount: counts[category._id.toString()] || 0
+      }))
+    );
   } catch (error) {
     res.status(500).json({ message: "Error fetching categories" });
   }
@@ -479,7 +664,7 @@ app.get("/nominees/:categoryId", async (req, res) => {
   try {
     const nominees = await Nominee.find({
       categoryId: req.params.categoryId
-    }).sort({ name: 1 });
+    }).sort({ name: 1, enrollmentNumber: 1 });
 
     res.json(nominees);
   } catch (error) {
@@ -490,40 +675,43 @@ app.get("/nominees/:categoryId", async (req, res) => {
 app.post("/vote", async (req, res) => {
   try {
     const enrollmentNumber = (req.body.enrollmentNumber || "").trim();
-    const { categoryId, nomineeId } = req.body;
+    const { categoryId } = req.body;
+    const nomineeId = req.body.nomineeId || req.body.candidateId;
 
     const student = await Student.findOne({ enrollmentNumber });
     if (!student) {
       return res.status(400).json({ message: "Student not allowed to vote" });
     }
 
-    const category = await Category.findById(categoryId);
+    const category = await Category.findById(categoryId).lean();
     if (!category || !category.isActive) {
       return res.status(400).json({ message: "This round is not active right now" });
     }
 
-    const nominee = await Nominee.findById(nomineeId);
-    if (!nominee || nominee.categoryId !== category._id.toString()) {
-      return res.status(400).json({ message: "Selected nominee is not valid for this round" });
+    const snapshot = await getRoundSnapshot(category);
+    const validCandidateIds = new Set(snapshot.roundContestants.map(contestant => contestant._id.toString()));
+
+    if (!validCandidateIds.has(String(nomineeId || ""))) {
+      return res.status(400).json({ message: "Selected student is not valid for this round" });
     }
 
+    const currentRoundNumber = category.currentRoundNumber || 1;
     const existingVote = await Vote.findOne({
       enrollmentNumber: student.enrollmentNumber,
-      categoryId
+      categoryId,
+      $or: buildRoundMatch(currentRoundNumber)
     });
 
     if (existingVote) {
-      return res.status(400).json({ message: "Already voted in this category" });
+      return res.status(400).json({ message: "Already voted in this round" });
     }
 
     await Vote.create({
       enrollmentNumber: student.enrollmentNumber,
       categoryId,
-      nomineeId
+      nomineeId,
+      roundNumber: currentRoundNumber
     });
-
-    nominee.votes += 1;
-    await nominee.save();
 
     res.json({ message: "Vote submitted successfully" });
   } catch (error) {
@@ -571,24 +759,7 @@ app.post("/admin/students", requireAdmin, async (req, res) => {
 
 app.post("/admin/students/import", requireAdmin, async (req, res) => {
   try {
-    let students = Array.isArray(req.body.students) ? req.body.students : [];
-
-    if (!students.length && req.body.fileContentBase64) {
-      const fileName = (req.body.fileName || "").toLowerCase();
-      const fileBuffer = Buffer.from(req.body.fileContentBase64, "base64");
-
-      if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
-        const workbook = XLSX.read(fileBuffer, { type: "buffer" });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
-        students = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-      } else {
-        const workbook = XLSX.read(fileBuffer, { type: "buffer" });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
-        students = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-      }
-    }
+    const students = parseSpreadsheetPayload(req.body);
 
     if (!students.length) {
       return res.status(400).json({ message: "No students found in uploaded list" });
@@ -602,32 +773,15 @@ app.post("/admin/students/import", requireAdmin, async (req, res) => {
     const seen = new Set();
 
     students.forEach(student => {
-      const normalizedKeys = Object.keys(student).reduce((keys, key) => {
-        keys[key.toLowerCase().replace(/\s+/g, "")] = student[key];
-        return keys;
-      }, {});
-
-      const name = String(
-        normalizedKeys.name || normalizedKeys.studentname || ""
-      ).trim();
-
-      const enrollmentNumber = String(
-        normalizedKeys.enrollmentnumber ||
-        normalizedKeys.enrollment ||
-        normalizedKeys.admissionnumber ||
-        ""
-      ).trim();
-
-      if (!name || !enrollmentNumber) {
+      if (
+        existingEnrollmentNumbers.has(student.enrollmentNumber) ||
+        seen.has(student.enrollmentNumber)
+      ) {
         return;
       }
 
-      if (existingEnrollmentNumbers.has(enrollmentNumber) || seen.has(enrollmentNumber)) {
-        return;
-      }
-
-      seen.add(enrollmentNumber);
-      uniquePayload.push({ name, enrollmentNumber });
+      seen.add(student.enrollmentNumber);
+      uniquePayload.push(student);
     });
 
     if (uniquePayload.length) {
@@ -635,7 +789,7 @@ app.post("/admin/students/import", requireAdmin, async (req, res) => {
     }
 
     res.json({
-      message: `Imported ${uniquePayload.length} student(s)`,
+      message: `Imported ${uniquePayload.length} voter(s)`,
       importedCount: uniquePayload.length,
       skippedCount: students.length - uniquePayload.length
     });
@@ -651,23 +805,6 @@ app.delete("/admin/students/:id", requireAdmin, async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-
-    const votes = await Vote.find({
-      enrollmentNumber: student.enrollmentNumber
-    }).lean();
-
-    const voteCountsByNominee = votes.reduce((counts, vote) => {
-      counts[vote.nomineeId] = (counts[vote.nomineeId] || 0) + 1;
-      return counts;
-    }, {});
-
-    await Promise.all(
-      Object.entries(voteCountsByNominee).map(([nomineeId, count]) =>
-        Nominee.findByIdAndUpdate(nomineeId, {
-          $inc: { votes: -count }
-        })
-      )
-    );
 
     await Vote.deleteMany({ enrollmentNumber: student.enrollmentNumber });
     await Student.findByIdAndDelete(req.params.id);
@@ -696,6 +833,7 @@ app.get("/admin/participation", requireAdmin, async (req, res) => {
 app.post("/admin/categories", requireAdmin, async (req, res) => {
   try {
     const name = (req.body.name || "").trim();
+    const studentListLabel = (req.body.studentListLabel || "").trim();
 
     if (!name) {
       return res.status(400).json({ message: "Category name is required" });
@@ -708,6 +846,7 @@ app.post("/admin/categories", requireAdmin, async (req, res) => {
 
     const category = await Category.create({
       name,
+      studentListLabel,
       isActive: false,
       closedAt: null
     });
@@ -721,6 +860,7 @@ app.post("/admin/categories", requireAdmin, async (req, res) => {
 app.put("/admin/categories/:id", requireAdmin, async (req, res) => {
   try {
     const name = (req.body.name || "").trim();
+    const studentListLabel = (req.body.studentListLabel || "").trim();
 
     if (!name) {
       return res.status(400).json({ message: "Category name is required" });
@@ -737,7 +877,7 @@ app.put("/admin/categories/:id", requireAdmin, async (req, res) => {
 
     const category = await Category.findByIdAndUpdate(
       req.params.id,
-      { $set: { name } },
+      { $set: { name, studentListLabel } },
       { new: true }
     );
 
@@ -759,22 +899,8 @@ app.delete("/admin/categories/:id", requireAdmin, async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    const nominees = await Nominee.find({
-      categoryId: category._id.toString()
-    }).lean();
-
-    const nomineeIds = nominees.map(nominee => nominee._id.toString());
-
-    await Vote.deleteMany({
-      $or: [
-        { categoryId: category._id.toString() },
-        { nomineeId: { $in: nomineeIds } }
-      ]
-    });
-
-    await Nominee.deleteMany({
-      categoryId: category._id.toString()
-    });
+    await Vote.deleteMany({ categoryId: category._id.toString() });
+    await Nominee.deleteMany({ categoryId: category._id.toString() });
 
     await Category.findByIdAndDelete(req.params.id);
 
@@ -794,7 +920,7 @@ app.post("/admin/categories/:id/activate", requireAdmin, async (req, res) => {
 
     res.json({ message: `${category.name} is now the active round`, category });
   } catch (error) {
-    res.status(500).json({ message: "Could not activate round" });
+    res.status(400).json({ message: error.message || "Could not activate round" });
   }
 });
 
@@ -829,30 +955,45 @@ app.post("/admin/categories/:id/announce-winner", requireAdmin, async (req, res)
       return res.status(404).json({ message: "Category not found" });
     }
 
-    const nominees = await Nominee.find({
-      categoryId: category._id.toString()
-    }).sort({ votes: -1, name: 1 });
+    const snapshot = await getRoundSnapshot(category.toObject());
 
-    if (!nominees.length || nominees[0].votes <= 0) {
+    if (!snapshot.roundContestants.length || snapshot.roundContestants[0].votes <= 0) {
       return res.status(400).json({ message: "No winner can be announced yet" });
     }
 
-    const topVotes = nominees[0].votes;
-    const winners = nominees
-      .filter(nominee => nominee.votes === topVotes)
-      .map(nominee => ({
-        nomineeId: nominee._id.toString(),
-        name: nominee.name,
-        image: nominee.image || "",
-        details: nominee.details || "",
-        votes: nominee.votes
-      }));
+    const topVotes = snapshot.roundContestants[0].votes;
+    const winners = snapshot.roundContestants.filter(contestant => contestant.votes === topVotes);
+
+    if (winners.length > 1) {
+      await Category.updateMany({}, { $set: { isActive: false } });
+
+      category.winnerAnnounced = false;
+      category.announcedAt = null;
+      category.announcedWinners = [];
+      category.isActive = true;
+      category.closedAt = null;
+      category.isRunoff = true;
+      category.currentRoundNumber = (category.currentRoundNumber || 1) + 1;
+      category.activeCandidateIds = winners.map(winner => winner._id.toString());
+      await category.save();
+
+      return res.json({
+        message: `Draw detected. Runoff round ${category.currentRoundNumber} is now live for ${category.name}.`,
+        category
+      });
+    }
 
     category.winnerAnnounced = true;
     category.announcedAt = new Date();
-    category.announcedWinners = winners;
+    category.announcedWinners = winners.map(winner => ({
+      nomineeId: winner._id.toString(),
+      name: winner.name,
+      enrollmentNumber: winner.enrollmentNumber,
+      votes: winner.votes
+    }));
     category.isActive = false;
     category.closedAt = new Date();
+    category.isRunoff = false;
     await category.save();
 
     res.json({
@@ -879,41 +1020,84 @@ app.get("/admin/nominees", requireAdmin, async (req, res) => {
           ...nominee,
           categoryName: categoryMap.get(nominee.categoryId) || "Unassigned"
         }))
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => {
+          const categoryCompare = a.categoryName.localeCompare(b.categoryName);
+
+          if (categoryCompare !== 0) {
+            return categoryCompare;
+          }
+
+          return a.name.localeCompare(b.name);
+        })
     );
   } catch (error) {
     res.status(500).json({ message: "Error fetching nominees" });
   }
 });
 
-app.post("/admin/nominees", requireAdmin, async (req, res) => {
+app.get("/admin/categories/:id/contestants", requireAdmin, async (req, res) => {
   try {
-    const name = (req.body.name || "").trim();
-    const image = (req.body.image || "").trim();
-    const details = (req.body.details || "").trim();
-    const { categoryId } = req.body;
+    const contestants = await getCategoryContestants(req.params.id);
+    res.json(contestants);
+  } catch (error) {
+    res.status(500).json({ message: "Could not load class list" });
+  }
+});
 
-    if (!name || !categoryId) {
-      return res.status(400).json({
-        message: "Nominee name and category are required"
-      });
-    }
+app.post("/admin/categories/:id/contestants/import", requireAdmin, async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
 
-    const category = await Category.findById(categoryId);
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    const nominee = await Nominee.create({
-      name,
-      image,
-      details,
-      categoryId
+    const contestants = parseSpreadsheetPayload(req.body);
+
+    if (!contestants.length) {
+      return res.status(400).json({ message: "No students found in uploaded class list" });
+    }
+
+    const uniqueContestants = [];
+    const seen = new Set();
+
+    contestants.forEach(contestant => {
+      if (seen.has(contestant.enrollmentNumber)) {
+        return;
+      }
+
+      seen.add(contestant.enrollmentNumber);
+      uniqueContestants.push(contestant);
     });
 
-    res.status(201).json(nominee);
+    await Vote.deleteMany({ categoryId: category._id.toString() });
+    await Nominee.deleteMany({ categoryId: category._id.toString() });
+
+    const inserted = await Nominee.insertMany(
+      uniqueContestants.map(contestant => ({
+        name: contestant.name,
+        enrollmentNumber: contestant.enrollmentNumber,
+        categoryId: category._id.toString()
+      }))
+    );
+
+    category.isActive = false;
+    category.isRunoff = false;
+    category.currentRoundNumber = 1;
+    category.activeCandidateIds = inserted.map(contestant => contestant._id.toString());
+    category.closedAt = null;
+    category.winnerAnnounced = false;
+    category.announcedAt = null;
+    category.announcedWinners = [];
+    await category.save();
+
+    res.json({
+      message: `Uploaded ${inserted.length} student(s) for ${category.name}`,
+      importedCount: inserted.length,
+      skippedCount: contestants.length - inserted.length
+    });
   } catch (error) {
-    res.status(500).json({ message: "Could not create nominee" });
+    res.status(500).json({ message: "Could not upload class list" });
   }
 });
 
@@ -922,40 +1106,43 @@ app.delete("/admin/nominees/:id", requireAdmin, async (req, res) => {
     const nominee = await Nominee.findById(req.params.id);
 
     if (!nominee) {
-      return res.status(404).json({ message: "Nominee not found" });
+      return res.status(404).json({ message: "Student not found in class list" });
     }
 
-    const categoryId = nominee.categoryId;
     await Vote.deleteMany({ nomineeId: nominee._id.toString() });
     await Nominee.findByIdAndDelete(req.params.id);
 
-    await Category.updateMany(
-      { _id: categoryId },
+    await Category.updateOne(
+      { _id: nominee.categoryId },
       {
+        $pull: { activeCandidateIds: nominee._id.toString() },
         $set: {
           winnerAnnounced: false,
           announcedAt: null,
           announcedWinners: [],
-          closedAt: null
+          closedAt: null,
+          isRunoff: false
         }
       }
     );
 
-    res.json({ message: "Nominee deleted successfully" });
+    res.json({ message: "Student removed from class list" });
   } catch (error) {
-    res.status(500).json({ message: "Could not delete nominee" });
+    res.status(500).json({ message: "Could not delete class list student" });
   }
 });
 
 app.post("/admin/reset-votes", requireAdmin, async (req, res) => {
   try {
     await Vote.deleteMany({});
-    await Nominee.updateMany({}, { $set: { votes: 0 } });
     await Category.updateMany(
       {},
       {
         $set: {
           isActive: false,
+          isRunoff: false,
+          currentRoundNumber: 1,
+          activeCandidateIds: [],
           closedAt: null,
           winnerAnnounced: false,
           announcedAt: null,
@@ -1011,35 +1198,29 @@ app.get("/setup", async (req, res) => {
       { enrollmentNumber: "103", name: "Nihal" }
     ]);
 
-    const cat1 = await Category.create({ name: "Best Student", isActive: true });
-    const cat2 = await Category.create({ name: "Best Performer", isActive: false });
+    const cat1 = await Category.create({
+      name: "Mr Farewell",
+      studentListLabel: "MBA 2nd Year",
+      isActive: true,
+      currentRoundNumber: 1
+    });
+    const cat2 = await Category.create({
+      name: "Best Performer",
+      studentListLabel: "BBA 3rd Year"
+    });
 
-    await Nominee.create([
-      {
-        name: "Ayaan",
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80",
-        details: "Strong academic record and consistent student leadership.",
-        categoryId: cat1._id.toString()
-      },
-      {
-        name: "Rahim",
-        image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80",
-        details: "Known for mentoring classmates and campus participation.",
-        categoryId: cat1._id.toString()
-      },
-      {
-        name: "Zaid",
-        image: "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?auto=format&fit=crop&w=600&q=80",
-        details: "Stage performer with strong event energy and crowd presence.",
-        categoryId: cat2._id.toString()
-      },
-      {
-        name: "Faizan",
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80",
-        details: "Recognized for creative performances and team coordination.",
-        categoryId: cat2._id.toString()
-      }
+    const cat1Contestants = await Nominee.insertMany([
+      { name: "Ayaan", enrollmentNumber: "MBA201", categoryId: cat1._id.toString() },
+      { name: "Rahim", enrollmentNumber: "MBA202", categoryId: cat1._id.toString() }
     ]);
+
+    await Nominee.insertMany([
+      { name: "Zaid", enrollmentNumber: "BBA301", categoryId: cat2._id.toString() },
+      { name: "Faizan", enrollmentNumber: "BBA302", categoryId: cat2._id.toString() }
+    ]);
+
+    cat1.activeCandidateIds = cat1Contestants.map(contestant => contestant._id.toString());
+    await cat1.save();
 
     res.send("Sample data inserted successfully");
   } catch (error) {

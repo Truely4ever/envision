@@ -12,9 +12,9 @@
     .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.linkish{display:inline-flex;align-items:center;justify-content:center;padding:11px 15px;border-radius:999px;text-decoration:none;font-weight:700;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.18)}
     .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.stat{padding:15px;border-radius:16px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.14)}.stat small{display:block;margin-bottom:7px;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em}.stat strong{font-size:1.3rem}
     .section{margin-top:18px;border-radius:var(--r1)}.body{padding:18px}.head{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:14px}h3,h4{margin:0;letter-spacing:-.02em}.head p,.meta,.copy p,.empty,.row span{color:var(--muted);line-height:1.55}.pill{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;background:rgba(15,118,110,.1);color:#0f766e;font-size:.82rem;font-weight:700}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.card,.winner{background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 24px rgba(15,23,42,.05);border-radius:18px}.card{padding:15px}.winner{overflow:hidden}.img{width:100%;height:190px;object-fit:cover;background:linear-gradient(135deg,#dbeafe,#e0f2fe)}.copy{padding:15px;display:grid;gap:6px}.label{display:inline-flex;width:fit-content;padding:8px 12px;border-radius:999px;background:rgba(245,158,11,.14);color:#b45309;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 24px rgba(15,23,42,.05);border-radius:18px;padding:15px}.label{display:inline-flex;width:fit-content;padding:8px 12px;border-radius:999px;background:rgba(245,158,11,.14);color:#b45309;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
     .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 13px;border-radius:14px;background:#f8fbff;border:1px solid rgba(16,35,63,.06);margin-top:9px}.empty{padding:24px 18px;text-align:center;border-radius:18px;border:1px dashed rgba(16,35,63,.14);background:rgba(255,255,255,.6)}
-    @media (max-width:920px){.hero{grid-template-columns:1fr}} @media (max-width:720px){.shell{padding:14px 10px 28px}.hero{padding:18px}.stats{grid-template-columns:1fr}.body{padding:15px}.head{flex-direction:column}}
+    @media (max-width:920px){.hero{grid-template-columns:1fr}} @media (max-width:720px){.shell{padding:14px 10px 28px}.hero{padding:18px}.stats{grid-template-columns:1fr}.body{padding:15px}.head{flex-direction:column}.row{flex-direction:column;align-items:start}}
   </style>
 </head>
 <body>
@@ -22,7 +22,7 @@
     <section class="hero">
       <div>
         <h1>Admin Results</h1>
-        <p>See current round leaders, full vote totals, and every officially announced winner with photo and details.</p>
+        <p>See the current leaderboard for the live round, final winners for completed categories, and whether a category is in runoff mode.</p>
         <div class="actions">
           <a class="linkish" href="/admin/dashboard">Back To Dashboard</a>
           <a class="linkish" href="/">Student Voting</a>
@@ -30,33 +30,34 @@
       </div>
       <div class="stats">
         <div class="stat"><small>Categories</small><strong id="categoryCount">0</strong></div>
-        <div class="stat"><small>Total Votes</small><strong id="voteCount">0</strong></div>
+        <div class="stat"><small>Current Round Votes</small><strong id="voteCount">0</strong></div>
         <div class="stat"><small>Announced Winners</small><strong id="winnerCount">0</strong></div>
         <div class="stat"><small>Status</small><strong>Admin Only</strong></div>
       </div>
     </section>
 
     <section class="section"><div class="body">
-      <div class="head"><div><h3>Round Results</h3><p>Each category shows announced winners first, then the live leaderboard.</p></div><span class="pill">Protected Results</span></div>
+      <div class="head"><div><h3>Round Results</h3><p>Each category shows final winners first, then the live leaderboard for its current round.</p></div><span class="pill">Protected Results</span></div>
       <div id="results" class="grid"><div class="empty">Results will appear here once data is available.</div></div>
     </div></section>
   </main>
 
   <script>
     const esc = value => String(value ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    function statusLabel(category){if(category.isActive&&category.isRunoff)return`Runoff Round ${category.currentRoundNumber}`;if(category.isActive)return`Round ${category.currentRoundNumber} Active`;if(category.winnerAnnounced)return"Winner Announced";if(category.closedAt)return`Round ${category.currentRoundNumber} Paused`;return"Waiting"}
     async function loadResults(){
       try{
         const res=await fetch("/results-data");
         if(res.status===401){window.location.href="/admin";return}
         const results=await res.json();
         document.getElementById("categoryCount").textContent=results.length;
-        document.getElementById("voteCount").textContent=results.reduce((sum,c)=>sum+c.totalVotes,0);
+        document.getElementById("voteCount").textContent=results.reduce((sum,c)=>sum+(c.currentRoundVotes||0),0);
         document.getElementById("winnerCount").textContent=results.reduce((sum,c)=>sum+(c.announcedWinners?.length||0),0);
         document.getElementById("results").innerHTML=results.length?results.map(category=>{
-          const announced=(category.announcedWinners||[]).length?(category.announcedWinners||[]).map(w=>`<article class="winner"><img class="img" src="${esc(w.image||"https://via.placeholder.com/600x400?text=Winner")}" alt="${esc(w.name)}" onerror="this.onerror=null;this.src='https://via.placeholder.com/600x400?text=Winner';"><div class="copy"><span class="label">${category.announcedWinners.length>1?"Tie Winner":"Winner"}</span><h4>${esc(w.name)}</h4><p>${esc(w.details||"No winner details added.")}</p><div class="meta">Votes: ${w.votes}</div><div class="meta">Announced: ${category.announcedAt?new Date(category.announcedAt).toLocaleString():"Just now"}</div></div></article>`).join(""):`<div class="empty">Winner not announced yet.</div>`;
-          const leaders=(category.currentLeaders||[]).length?category.currentLeaders.map(l=>`<div class="row"><strong>${esc(l.name)}</strong><span>${l.votes} vote(s)</span></div>`).join(""):`<div class="empty">No votes recorded yet.</div>`;
-          const scores=(category.nominees||[]).length?category.nominees.map(n=>`<div class="row"><strong>${esc(n.name)}</strong><span>${n.votes} vote(s)</span></div>`).join(""):`<div class="empty">No nominees in this category yet.</div>`;
-          return `<section class="card"><div class="meta">Category</div><h3>${esc(category.name)}</h3><p>Total Votes: ${category.totalVotes}</p>${announced}<div class="meta"><strong>Current Leaders</strong></div>${leaders}<div class="meta"><strong>Leaderboard</strong></div>${scores}</section>`
+          const announced=(category.announcedWinners||[]).length?(category.announcedWinners||[]).map(w=>`<div class="row"><strong>${esc(w.name)}</strong><span>${esc(w.enrollmentNumber||"-")} • ${w.votes} vote(s)</span></div>`).join(""):`<div class="empty">Winner not announced yet.</div>`;
+          const leaders=(category.currentLeaders||[]).length?category.currentLeaders.map(l=>`<div class="row"><strong>${esc(l.name)}</strong><span>${esc(l.enrollmentNumber||"-")} • ${l.votes} vote(s)</span></div>`).join(""):`<div class="empty">No votes recorded yet.</div>`;
+          const scores=(category.nominees||[]).length?category.nominees.map(n=>`<div class="row"><strong>${esc(n.name)}</strong><span>${esc(n.enrollmentNumber||"-")} • ${n.votes} vote(s)</span></div>`).join(""):`<div class="empty">No class list uploaded yet.</div>`;
+          return `<section class="card"><span class="label">${esc(statusLabel(category))}</span><h3 style="margin-top:10px">${esc(category.name)}</h3><p class="meta">Class list: ${esc(category.studentListLabel||"Not set")}</p><p class="meta">Uploaded students: ${category.contestantCount||0} • Current round votes: ${category.currentRoundVotes||0}</p><div class="meta"><strong>Announced Winner</strong></div>${announced}<div class="meta" style="margin-top:12px"><strong>Current Leaders</strong></div>${leaders}<div class="meta" style="margin-top:12px"><strong>Current Round Leaderboard</strong></div>${scores}</section>`
         }).join(""):`<div class="empty">Results will appear here once categories exist.</div>`;
       }catch(error){
         document.getElementById("results").innerHTML=`<div class="empty">Could not load results from the server.</div>`
