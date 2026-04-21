@@ -23,10 +23,10 @@
     .mini,.announce,.contestant{background:var(--panel);border:1px solid var(--line);box-shadow:0 10px 24px rgba(15,23,42,.05);border-radius:18px}.mini,.result{padding:15px}
     .row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.row-actions button{flex:1 1 110px}.contestant{padding:15px;display:grid;gap:6px}
     .divider{height:1px;background:rgba(16,35,63,.08);margin:4px 0}.step{padding:14px;border-radius:18px;background:rgba(248,251,255,.9);border:1px solid rgba(16,35,63,.08)}.step strong{display:block;margin-bottom:4px}.step small{display:block;color:var(--muted);line-height:1.45}
-    .lane-stack{display:grid;gap:14px}.lane{padding:14px;border-radius:20px;background:rgba(248,251,255,.9);border:1px solid rgba(16,35,63,.08)}.lane-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}.lane-title{display:grid;gap:4px}.lane-title small{color:var(--muted)}.lane-track{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,240px);gap:12px;overflow-x:auto;padding-bottom:4px}.lane-track .contestant{min-height:100%}
+    .page-shell{display:grid;gap:14px}.page-card{padding:14px;border-radius:20px;background:rgba(248,251,255,.9);border:1px solid rgba(16,35,63,.08)}.page-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}.page-title{display:grid;gap:4px}.page-title small{color:var(--muted)}.page-meta{display:flex;flex-wrap:wrap;gap:8px}.student-list{display:grid;gap:12px}.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.pager-info{color:var(--muted);font-weight:700}
     .empty{padding:24px 18px;text-align:center;border-radius:18px;border:1px dashed rgba(16,35,63,.14);background:rgba(255,255,255,.6)} .meta strong{color:var(--text)}
     @media (max-width:1100px){.hero,.s4,.s5,.s7,.s8,.s12{grid-column:span 12}.hero{grid-template-columns:1fr}}
-    @media (max-width:720px){.shell{padding:14px 10px 28px}.hero{padding:18px}.stats{grid-template-columns:1fr}.body{padding:15px}.head,.lane-head{flex-direction:column}.scroll-panel{max-height:58vh;padding-right:2px}.lane-track{grid-auto-columns:minmax(210px,82vw)}}
+    @media (max-width:720px){.shell{padding:14px 10px 28px}.hero{padding:18px}.stats{grid-template-columns:1fr}.body{padding:15px}.head,.page-head,.pager{flex-direction:column;align-items:flex-start}.scroll-panel{max-height:58vh;padding-right:2px}}
   </style>
 </head>
 <body>
@@ -65,7 +65,7 @@
         <div class="stack">
           <div><label for="studentCsv">Spreadsheet File</label><input id="studentCsv" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
           <div><label for="studentCsvText">Or Paste CSV</label><textarea id="studentCsvText" placeholder="name,enrollmentNumber&#10;Amina,103&#10;Nihal,104"></textarea></div>
-          <button class="btn s" onclick="importStudents()">Import Voter List</button>
+          <div class="row-actions"><button class="btn s" onclick="importStudents()">Import Voter List</button><button class="btn d" onclick="deleteAllVoters()">Delete All Voters</button></div>
           <p class="help">Accepted columns: <code>name</code> and <code>enrollmentNumber</code>.</p>
           <p id="importMsg" class="msg"></p>
         </div>
@@ -102,35 +102,31 @@
       </div></div>
 
       <div class="card s5"><div class="body">
-        <div class="head"><div><h3>Upload Class List</h3><p>First choose the category you want to prepare, then either copy an existing list or upload a new one.</p></div><span class="pill">Contestants</span></div>
+        <div class="head"><div><h3>Upload Class List</h3><p>Select the category, upload the student list, and it will appear as a separate page on the right.</p></div><span class="pill">Contestants</span></div>
         <div class="flow">
-          <div class="step">
-            <strong>Step 1. Choose Target Category</strong>
-            <small>This is the category that will receive the uploaded or copied class list.</small>
-          </div>
+          <div class="step"><strong>Step 1. Choose Category</strong><small>Pick the category where this uploaded list should be used.</small></div>
           <div><label for="contestantCategory">Category</label><select id="contestantCategory" onchange="loadContestantPresets()"><option value="">Select category</option></select></div>
-          <div class="step">
-            <strong>Step 2. Quick Copy From Existing Category</strong>
-            <small>Use this when the same group of students should be reused for another category.</small>
-          </div>
+          <div class="step"><strong>Step 2. Or Copy Existing List</strong><small>Use a saved preset when the same class list should be applied to another category.</small></div>
           <div><label for="contestantPreset">Use Existing Uploaded Class List</label><select id="contestantPreset"><option value="">Select saved preset</option></select></div>
           <button class="btn p" onclick="applyContestantPreset()">Apply Preset To Category</button>
           <div class="divider"></div>
-          <div class="step">
-            <strong>Step 3. Upload New Class List</strong>
-            <small>Upload a spreadsheet or paste CSV if this category needs its own list.</small>
-          </div>
+          <div class="step"><strong>Step 3. Upload New Student List</strong><small>Add a fresh file or paste CSV for this category.</small></div>
           <div><label for="contestantFile">Spreadsheet File</label><input id="contestantFile" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
           <div><label for="contestantCsvText">Or Paste CSV</label><textarea id="contestantCsvText" placeholder="name,enrollmentNumber&#10;Ankit,MBA201&#10;Sara,MBA202"></textarea></div>
-          <button class="btn s" onclick="importContestants()">Upload Category List</button>
-          <p class="help">Uploading a new list or applying a preset replaces the old list and clears that category's votes.</p>
+          <div class="row-actions"><button class="btn s" onclick="importContestants()">Upload Category List</button><button class="btn d" onclick="deleteAllContestants()">Delete All Uploaded Lists</button></div>
+          <p class="help">Each category list is shown one page at a time on the right. Uploading a new list for the same category replaces that category's old list.</p>
           <p id="contestantMsg" class="msg"></p>
         </div>
       </div></div>
 
       <div class="card s7"><div class="body">
-        <div class="head"><div><h3>Uploaded Class Lists</h3><p>Each category now has its own lane, so it is easier to see which students belong where.</p></div><span class="pill">Roster</span></div>
-        <div id="nomineeList" class="lane-stack"><div class="empty">No class list uploaded yet.</div></div>
+        <div class="head"><div><h3>Uploaded Class Lists</h3><p>Use previous and next to move between uploaded category pages.</p></div><span class="pill">Roster</span></div>
+        <div class="pager">
+          <button class="btn m" onclick="changeClassListPage(-1)">Previous Page</button>
+          <div id="classListPageInfo" class="pager-info">Page 0 of 0</div>
+          <button class="btn m" onclick="changeClassListPage(1)">Next Page</button>
+        </div>
+        <div id="nomineeList" class="page-shell"><div class="empty">No class list uploaded yet.</div></div>
       </div></div>
 
       <div class="card s12"><div class="body">
@@ -142,6 +138,8 @@
   </main>
 
   <script>
+    let classListPages=[];
+    let currentClassListPage=0;
     const byId = id => document.getElementById(id);
     const esc = value => String(value ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
     const escJs = value => String(value ?? "").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
@@ -155,8 +153,10 @@
     function readFileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>{const result=String(reader.result||"");resolve(result.includes(",")?result.split(",")[1]:result)};reader.onerror=()=>reject(new Error("Could not read file"));reader.readAsDataURL(file)})}
     async function addStudent(){const name=byId("studentName").value.trim(),enrollmentNumber=byId("studentEnrollment").value.trim();if(!name||!enrollmentNumber){setMsg("studentMsg","Student name and enrollment number are required.","error");return}const {res,data}=await fetchJson("/admin/students",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,enrollmentNumber})});if(!res.ok){setMsg("studentMsg",data.message||"Could not add student.","error");return}byId("studentName").value="";byId("studentEnrollment").value="";setMsg("studentMsg","Voter added successfully.","success");await refresh()}
     async function importStudents(){try{const file=byId("studentCsv").files[0];const pasted=byId("studentCsvText").value.trim();let payload={students:[]};if(file){if(/\.(xlsx|xls)$/i.test(file.name)){payload={fileName:file.name,fileContentBase64:await readFileBase64(file)}}else{const csv=await readFileText(file);payload={students:parseStudentsCsv(csv)}}}else if(pasted){payload={students:parseStudentsCsv(pasted)}}else{setMsg("importMsg","Select a spreadsheet file or paste CSV rows first.","error");return}const {res,data}=await fetchJson("/admin/students/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!res.ok){setMsg("importMsg",data.message||"Could not import students.","error");return}byId("studentCsv").value="";byId("studentCsvText").value="";setMsg("importMsg",`${data.message}. Skipped ${data.skippedCount} row(s).`,"success");await refresh()}catch(error){setMsg("importMsg",error.message||"Could not import voter list.","error")}}
+    async function deleteAllVoters(){if(!confirm("Delete all voters and remove all vote records?"))return;const {res,data}=await fetchJson("/admin/students/reset",{method:"POST"});if(!res.ok){setMsg("importMsg",data.message||"Could not delete all voters.","error");return}setMsg("importMsg",data.message,"success");await refresh()}
     async function importContestants(){try{const categoryId=byId("contestantCategory").value;const file=byId("contestantFile").files[0];const pasted=byId("contestantCsvText").value.trim();if(!categoryId){setMsg("contestantMsg","Choose a category first.","error");return}let payload={students:[]};if(file){if(/\.(xlsx|xls)$/i.test(file.name)){payload={fileName:file.name,fileContentBase64:await readFileBase64(file)}}else{const csv=await readFileText(file);payload={students:parseStudentsCsv(csv)}}}else if(pasted){payload={students:parseStudentsCsv(pasted)}}else{setMsg("contestantMsg","Select a spreadsheet file or paste CSV rows first.","error");return}const {res,data}=await fetchJson(`/admin/categories/${categoryId}/contestants/import`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!res.ok){setMsg("contestantMsg",data.message||"Could not upload class list.","error");return}byId("contestantFile").value="";byId("contestantCsvText").value="";setMsg("contestantMsg",`${data.message}. Skipped ${data.skippedCount} duplicate row(s).`,"success");await refresh()}catch(error){setMsg("contestantMsg",error.message||"Could not upload class list.","error")}}
     async function applyContestantPreset(){const categoryId=byId("contestantCategory").value,presetId=byId("contestantPreset").value;if(!categoryId){setMsg("contestantMsg","Choose a category first.","error");return}if(!presetId){setMsg("contestantMsg","Choose a saved preset first.","error");return}const {res,data}=await fetchJson(`/admin/categories/${categoryId}/contestants/apply-preset`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sourceCategoryId:presetId})});if(!res.ok){setMsg("contestantMsg",data.message||"Could not apply class list preset.","error");return}setMsg("contestantMsg",data.message,"success");await refresh()}
+    async function deleteAllContestants(){if(!confirm("Delete all uploaded category class lists and clear related votes?"))return;const {res,data}=await fetchJson("/admin/contestants/reset",{method:"POST"});if(!res.ok){setMsg("contestantMsg",data.message||"Could not delete uploaded class lists.","error");return}setMsg("contestantMsg",data.message,"success");await refresh()}
     async function changePassword(){const currentPassword=byId("currentPassword").value;const newPassword=byId("newPassword").value;if(!currentPassword||!newPassword){setMsg("passwordMsg","Current password and new password are required.","error");return}const {res,data}=await fetchJson("/admin/change-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({currentPassword,newPassword})});if(!res.ok){setMsg("passwordMsg",data.message||"Could not change password.","error");return}byId("currentPassword").value="";byId("newPassword").value="";setMsg("passwordMsg",data.message,"success")}
     async function deleteStudent(id){if(!confirm("Delete this voter and remove their vote record?"))return;await fetchJson(`/admin/students/${id}`,{method:"DELETE"});await refresh()}
     async function addCategory(){const name=byId("categoryName").value.trim(),studentListLabel=byId("categoryListLabel").value.trim();if(!name){setMsg("categoryMsg","Category name is required.","error");return}const {res,data}=await fetchJson("/admin/categories",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,studentListLabel})});if(!res.ok){setMsg("categoryMsg",data.message||"Could not create category.","error");return}byId("categoryName").value="";byId("categoryListLabel").value="";setMsg("categoryMsg","Category created successfully.","success");await refresh()}
@@ -172,7 +172,9 @@
     function categoryStatus(category){if(category.isActive)return category.isRunoff?`Runoff Round ${category.currentRoundNumber} Active`:"Active now";if(category.winnerAnnounced)return"Winner announced";if(category.closedAt)return"Voting paused";return"Inactive"}
     async function loadCategories(){const res=await fetch("/categories");const categories=await res.json();byId("contestantCategory").innerHTML=`<option value="">Select category</option>${categories.map(c=>`<option value="${c._id}">${esc(c.name)}</option>`).join("")}`;byId("categoryList").innerHTML=categories.length?categories.map(c=>`<article class="mini"><div class="meta">Round Category</div><h4>${esc(c.name)}</h4>${statusHtml(categoryStatus(c))}<div class="meta">Class list: <strong>${esc(c.studentListLabel||"Not set")}</strong></div><div class="meta">Uploaded students: <strong>${c.contestantCount||0}</strong></div><div class="meta">Round number: <strong>${c.currentRoundNumber||1}</strong></div><div class="row-actions"><button class="m" onclick="editCategory('${c._id}','${escJs(c.name)}','${escJs(c.studentListLabel||"")}')">Edit</button><button class="p" onclick="activateCategory('${c._id}')">Activate</button><button class="w" onclick="closeCategory('${c._id}')">Pause Voting</button><button class="s" onclick="announceWinner('${c._id}')">Finish Round</button><button class="d" onclick="deleteCategory('${c._id}')">Delete</button></div></article>`).join(""):`<div class="empty">No categories added yet.</div>`;await loadContestantPresets(categories)}
     async function loadContestantPresets(categories=[]){const presetsResponse=await fetchJson("/admin/class-list-presets");const presets=presetsResponse.data||[];const categoryId=byId("contestantCategory").value;byId("contestantPreset").innerHTML=`<option value="">Select saved preset</option>${presets.filter(p=>p._id!==categoryId).map(p=>`<option value="${p._id}">${esc(p.name)}${p.studentListLabel?` - ${esc(p.studentListLabel)}`:""} (${p.contestantCount})</option>`).join("")}`}
-    async function loadNominees(){const {data:nominees}=await fetchJson("/admin/nominees");if(!nominees.length){byId("nomineeList").innerHTML=`<div class="empty">No class list uploaded yet.</div>`;return}const grouped=nominees.reduce((map,nominee)=>{const key=nominee.categoryName||"Unassigned";if(!map[key])map[key]=[];map[key].push(nominee);return map},{}) ;byId("nomineeList").innerHTML=Object.entries(grouped).map(([categoryName,items])=>`<section class="lane"><div class="lane-head"><div class="lane-title"><h4>${esc(categoryName)}</h4><small>${items.length} student(s) in this uploaded class list</small></div><span class="pill">Category</span></div><div class="lane-track">${items.map(n=>`<article class="contestant"><div class="meta">Student</div><h4>${esc(n.name)}</h4><div class="meta">Enrollment: <strong>${esc(n.enrollmentNumber||"-")}</strong></div><div class="meta">Used in: ${esc(n.categoryName)}</div><div class="row-actions"><button class="d" onclick="deleteNominee('${n._id}')">Remove Student</button></div></article>`).join("")}</div></section>`).join("")}
+    function renderClassListPage(){const totalPages=classListPages.length;byId("classListPageInfo").textContent=totalPages?`Page ${currentClassListPage+1} of ${totalPages}`:"Page 0 of 0";if(!totalPages){byId("nomineeList").innerHTML=`<div class="empty">No class list uploaded yet.</div>`;return}const page=classListPages[currentClassListPage];byId("nomineeList").innerHTML=`<section class="page-card"><div class="page-head"><div class="page-title"><h4>${esc(page.categoryName)}</h4><small>${page.items.length} student(s) in this uploaded list</small></div><div class="page-meta"><span class="pill">Category</span><span class="pill">${esc(page.studentListLabel||"Class list")}</span></div></div><div class="student-list">${page.items.map(n=>`<article class="contestant"><div class="meta">Student</div><h4>${esc(n.name)}</h4><div class="meta">Enrollment: <strong>${esc(n.enrollmentNumber||"-")}</strong></div><div class="meta">Category: ${esc(page.categoryName)}</div><div class="row-actions"><button class="d" onclick="deleteNominee('${n._id}')">Remove Student</button></div></article>`).join("")}</div></section>`}
+    function changeClassListPage(direction){if(!classListPages.length)return;currentClassListPage=(currentClassListPage+direction+classListPages.length)%classListPages.length;renderClassListPage()}
+    async function loadNominees(){const {data:nominees}=await fetchJson("/admin/nominees");if(!nominees.length){classListPages=[];currentClassListPage=0;renderClassListPage();return}const grouped=nominees.reduce((map,nominee)=>{const key=nominee.categoryName||"Unassigned";if(!map[key])map[key]={categoryName:key,studentListLabel:nominee.studentListLabel||"",items:[]};map[key].items.push(nominee);return map},{}) ;classListPages=Object.values(grouped).sort((a,b)=>a.categoryName.localeCompare(b.categoryName));currentClassListPage=Math.min(currentClassListPage,classListPages.length-1);renderClassListPage()}
     async function loadAnnouncements(){const {data:results}=await fetchJson("/admin/results");byId("voteCount").textContent=results.reduce((sum,c)=>sum+(c.currentRoundVotes||0),0);const cards=[];results.forEach(category=>{if(Array.isArray(category.announcedWinners)&&category.announcedWinners.length){category.announcedWinners.forEach(w=>cards.push(`<article class="contestant"><div class="meta">${esc(category.name)}</div><h4>${esc(w.name)}</h4><div class="meta">Enrollment: <strong>${esc(w.enrollmentNumber||"-")}</strong></div><div class="meta">Votes: ${w.votes}</div><div class="meta">Announced: ${category.announcedAt?new Date(category.announcedAt).toLocaleString():"Just now"}</div></article>`))}});byId("announcementList").innerHTML=cards.length?cards.join(""):`<div class="empty">No winners announced yet.</div>`}
     async function refresh(){await loadParticipation();await loadCategories();await loadNominees();await loadAnnouncements()}
     async function init(){await ensureSession();await refresh()}

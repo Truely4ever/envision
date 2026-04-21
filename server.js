@@ -860,6 +860,17 @@ app.delete("/admin/students/:id", requireAdmin, async (req, res) => {
   }
 });
 
+app.post("/admin/students/reset", requireAdmin, async (req, res) => {
+  try {
+    await Vote.deleteMany({});
+    await Student.deleteMany({});
+
+    res.json({ message: "All voters have been deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Could not delete all voters" });
+  }
+});
+
 app.get("/admin/participation", requireAdmin, async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 }).lean();
@@ -1056,14 +1067,21 @@ app.get("/admin/nominees", requireAdmin, async (req, res) => {
     const nominees = await Nominee.find().lean();
 
     const categoryMap = new Map(
-      categories.map(category => [category._id.toString(), category.name])
+      categories.map(category => [
+        category._id.toString(),
+        {
+          name: category.name,
+          studentListLabel: category.studentListLabel || ""
+        }
+      ])
     );
 
     res.json(
       nominees
         .map(nominee => ({
           ...nominee,
-          categoryName: categoryMap.get(nominee.categoryId) || "Unassigned"
+          categoryName: categoryMap.get(nominee.categoryId)?.name || "Unassigned",
+          studentListLabel: categoryMap.get(nominee.categoryId)?.studentListLabel || ""
         }))
         .sort((a, b) => {
           const categoryCompare = a.categoryName.localeCompare(b.categoryName);
@@ -1176,6 +1194,32 @@ app.post("/admin/categories/:id/contestants/apply-preset", requireAdmin, async (
     });
   } catch (error) {
     res.status(500).json({ message: "Could not apply class list preset" });
+  }
+});
+
+app.post("/admin/contestants/reset", requireAdmin, async (req, res) => {
+  try {
+    await Vote.deleteMany({});
+    await Nominee.deleteMany({});
+    await Category.updateMany(
+      {},
+      {
+        $set: {
+          isActive: false,
+          isRunoff: false,
+          currentRoundNumber: 1,
+          activeCandidateIds: [],
+          closedAt: null,
+          winnerAnnounced: false,
+          announcedAt: null,
+          announcedWinners: []
+        }
+      }
+    );
+
+    res.json({ message: "All uploaded class lists have been deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Could not delete uploaded class lists" });
   }
 });
 
